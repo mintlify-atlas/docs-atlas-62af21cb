@@ -1,0 +1,147 @@
+---
+title: "PM matrix"
+description: "Configure the SAP PM-like classification matrix that links work order classes with activity classes for preventive maintenance entries."
+---
+
+The PM matrix (Mantenimiento de Planta) is a three-layer configuration that allows logbook entries to carry SAP-like maintenance classification. It consists of:
+
+<CardGroup cols={3}>
+  <Card title="Clase de Orden" icon="file-text">
+    Broad work-order categories (e.g., scheduled, unscheduled, modernization).
+  </Card>
+  <Card title="Clase de Actividad" icon="wrench">
+    Specific activity types performed within an order (e.g., preventive, corrective, inspection).
+  </Card>
+  <Card title="Matriz Orden-Actividad" icon="table">
+    The many-to-many join that authorizes which activity classes are valid for each order class.
+  </Card>
+</CardGroup>
+
+Administrators manage all three from **Administración > Matriz PM** (`/pm-matriz`).
+
+## Clase de Orden (work order class)
+
+The `PmClaseOrden` model stores records in the `pm_clase_orden` table. A clase de orden groups entries that share the same type of maintenance work.
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `nombre` | string | Yes | Display name (unique). |
+| `descripcion` | string | No | Explanation of when to use this order class. |
+| `activo` | boolean | Yes | Inactive order classes do not appear in the entry form. |
+
+### Default values
+
+The `PmLikeSeeder` seeds the following order classes:
+
+| Nombre | Descripción |
+|---|---|
+| Actividad No Programada | Trabajo no programado (urgente/correctivo) |
+| Actividad Programada | Trabajo programado (rutinas/plan) |
+| Modernización y Puesta en Servicio | Trabajo de modernización y puesta en servicio |
+
+## Clase de Actividad (activity class)
+
+The `PmClaseActividad` model stores records in the `pm_clase_actividad` table. An activity class describes the specific nature of the work performed.
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `nombre` | string | Yes | Display name (unique). |
+| `descripcion` | string | No | Description of the activity type. |
+| `activo` | boolean | Yes | Inactive activity classes do not appear in the entry form. |
+
+### Default values
+
+The `PmLikeSeeder` seeds the following activity classes:
+
+| Nombre | Descripción |
+|---|---|
+| Preventivo | Mantenimiento preventivo |
+| Predictivo / Inspección | Mantenimiento predictivo / inspección |
+| Supervisión | Supervisión / verificación |
+| Capacitación | Capacitación |
+| Calidad | Calidad |
+| Apoyo Operativo | Apoyo operativo a otro proceso de transmisión |
+| Apoyo Generación | Apoyo a Generación |
+| Apoyo Distribución | Apoyo a Distribución |
+| Apoyo CENACE | Apoyo a CENACE |
+| Correctivo | Atención correctiva |
+| Modernización | Modernización |
+| Puesta en Servicio | Puesta en Servicio |
+
+## Matriz Orden-Actividad
+
+The `PmMatrizOrdenActividad` model stores pairs in the `pm_matriz_orden_actividad` table. Each row authorizes a specific `(pm_clase_orden_id, pm_clase_actividad_id)` combination. When an operator creates an entry and selects a Clase de Orden, only the activity classes linked in the matrix are available as options.
+
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `pm_clase_orden_id` | FK | Reference to `pm_clase_orden`. |
+| `pm_clase_actividad_id` | FK | Reference to `pm_clase_actividad`. |
+| `activo` | boolean | Whether this pairing is currently active. |
+
+### Default matrix
+
+The `PmLikeSeeder` creates the following authorized pairings:
+
+<AccordionGroup>
+  <Accordion title="Actividad Programada">
+    Preventivo, Predictivo / Inspección, Correctivo, Supervisión, Capacitación, Calidad, Apoyo Operativo, Apoyo Generación, Apoyo Distribución, Apoyo CENACE.
+  </Accordion>
+  <Accordion title="Actividad No Programada">
+    Correctivo, Supervisión, Capacitación, Calidad, Apoyo Operativo, Apoyo Generación, Apoyo Distribución, Apoyo CENACE.
+  </Accordion>
+  <Accordion title="Modernización y Puesta en Servicio">
+    Modernización, Puesta en Servicio.
+  </Accordion>
+</AccordionGroup>
+
+## How entries use PM classifications
+
+When you create or edit a logbook entry, the PM section lets you select a Clase de Orden and then a Clase de Actividad. The activity dropdown is filtered to only show combinations that exist and are active in the matrix. If a Clase de Actividad has no active matrix row, it appears with a **Pendiente** badge in the summary view.
+
+## Admin management UI
+
+The `/pm-matriz` page has four sections:
+
+1. **Summary counters** — total order classes, total activity classes, and a count of activity classes with no matrix assignment (**Requiere Acción**).
+2. **Clases de Orden** — CRUD table with search and status filter. Click **Nueva** to add an order class; click the edit icon to modify or the delete icon to remove (disabled while **En uso**).
+3. **Clases de Actividad** — same CRUD pattern for activity classes.
+4. **Relaciones Orden - Actividad** — the matrix join table. Click **Asignar actividad a orden** to create a new pairing. You cannot assign an inactive order class or an inactive activity class.
+
+<Warning>
+You cannot delete an order class, activity class, or matrix row while it is tagged **En uso** (referenced by at least one logbook entry). Deactivate it instead.
+</Warning>
+
+## API routes
+
+Public read-only endpoints (no authentication required):
+
+```http
+GET /api/v1/catalogos/pm/ordenes
+GET /api/v1/catalogos/pm/actividades
+GET /api/v1/catalogos/pm/matriz
+```
+
+Admin CRUD (requires `administrador` role):
+
+```http
+GET    /api/v1/admin/pm/ordenes
+POST   /api/v1/admin/pm/ordenes
+PUT    /api/v1/admin/pm/ordenes/{orden}
+DELETE /api/v1/admin/pm/ordenes/{orden}
+
+GET    /api/v1/admin/pm/actividades
+POST   /api/v1/admin/pm/actividades
+PUT    /api/v1/admin/pm/actividades/{actividad}
+DELETE /api/v1/admin/pm/actividades/{actividad}
+
+GET    /api/v1/admin/pm/matriz
+POST   /api/v1/admin/pm/matriz
+PUT    /api/v1/admin/pm/matriz/{matriz}
+DELETE /api/v1/admin/pm/matriz/{matriz}
+```

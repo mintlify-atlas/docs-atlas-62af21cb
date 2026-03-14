@@ -1,0 +1,250 @@
+---
+title: "Locations and equipment (public)"
+description: "List technical locations, location level detail labels, and equipment records."
+---
+
+These endpoints return the master data for technical locations and equipment. No authentication is required.
+
+---
+
+## List technical locations
+
+`GET /api/v1/ubicaciones`
+
+Returns active `DmUbicacionTecnica` records ordered by `codigo`. Supports hierarchical filtering by level segments and a special `distinct_nivel` mode that returns unique values for a single level column.
+
+### Query parameters
+
+<ParamField query="q" type="string">
+  Search term. Partial-match on `codigo`, `nombre`, and `nivel_1` through `nivel_8`.
+</ParamField>
+
+<ParamField query="id" type="integer">
+  Return the single record with this ID.
+</ParamField>
+
+<ParamField query="nivel_1" type="string">
+  Filter by level-1 code (max 2 characters, uppercased).
+</ParamField>
+
+<ParamField query="nivel_2" type="string">
+  Filter by level-2 code (max 4 characters, uppercased).
+</ParamField>
+
+<ParamField query="nivel_3" type="string">
+  Filter by level-3 code (max 2 characters, uppercased).
+</ParamField>
+
+<ParamField query="distinct_nivel" type="integer">
+  When set to `1`, `2`, or `3`, returns a plain array of distinct values for that level column instead of the full record list. Level filters for lower levels still apply.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum number of records to return. Capped at `1000`.
+</ParamField>
+
+### Response
+
+When `distinct_nivel` is **not** set, returns a resource collection with a `meta` envelope:
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="DmUbicacionTecnica">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="codigo" type="string">Full location code.</ResponseField>
+    <ResponseField name="nombre" type="string">Location name.</ResponseField>
+    <ResponseField name="nivel_1" type="string | null">Level-1 segment.</ResponseField>
+    <ResponseField name="nivel_2" type="string | null">Level-2 segment.</ResponseField>
+    <ResponseField name="nivel_3" type="string | null">Level-3 segment.</ResponseField>
+    <ResponseField name="nivel_4" type="string | null">Level-4 segment.</ResponseField>
+    <ResponseField name="nivel_5" type="string | null">Level-5 segment.</ResponseField>
+    <ResponseField name="nivel_6" type="string | null">Level-6 segment.</ResponseField>
+    <ResponseField name="nivel_7" type="string | null">Level-7 segment.</ResponseField>
+    <ResponseField name="nivel_8" type="string | null">Level-8 segment.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the location is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  <Expandable title="meta">
+    <ResponseField name="total" type="integer">Total matching records before `limit` is applied.</ResponseField>
+    <ResponseField name="shown" type="integer">Number of records returned in this response.</ResponseField>
+    <ResponseField name="limit" type="integer | null">The applied limit, or `null` if none was set.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+When `distinct_nivel` is set, returns:
+
+```json
+{ "data": ["AB", "CD", "EF"] }
+```
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/ubicaciones?nivel_1=AB&limit=50" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 201,
+      "codigo": "AB-CD01-EF-GH-IJ",
+      "nombre": "Sala de equipo norte",
+      "nivel_1": "AB",
+      "nivel_2": "ABCD",
+      "nivel_3": "EF",
+      "nivel_4": "GH",
+      "nivel_5": null,
+      "nivel_6": null,
+      "nivel_7": null,
+      "nivel_8": null,
+      "activo": true
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "shown": 1,
+    "limit": 50
+  }
+}
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |
+
+---
+
+## List location level detail
+
+`GET /api/v1/ubicaciones/detalle-niveles`
+
+Returns active `DmUbicacionDetalleNivel` records. These are the human-readable labels associated with level-segment codes (e.g. level 3 branch labels).
+
+### Query parameters
+
+<ParamField query="nivel" type="integer">
+  Filter by level number (1–8).
+</ParamField>
+
+<ParamField query="rama_nivel_3" type="string">
+  Filter by the 2-character level-3 branch code (uppercased).
+</ParamField>
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="DmUbicacionDetalleNivel">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="nivel" type="integer">Level number (1–8).</ResponseField>
+    <ResponseField name="codigo" type="string">Level-segment code.</ResponseField>
+    <ResponseField name="rama_nivel_3" type="string | null">Level-3 branch code this record belongs to.</ResponseField>
+    <ResponseField name="nombre" type="string">Human-readable label for the segment code.</ResponseField>
+    <ResponseField name="descripcion" type="string | null">Optional description.</ResponseField>
+    <ResponseField name="origen" type="string | null">Source system.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the record is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/ubicaciones/detalle-niveles?nivel=3" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 55,
+      "nivel": 3,
+      "codigo": "EF",
+      "rama_nivel_3": "EF",
+      "nombre": "Edificio Central",
+      "descripcion": "Planta principal de operaciones.",
+      "origen": "SAP",
+      "activo": true
+    }
+  ]
+}
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |
+
+---
+
+## List equipment
+
+`GET /api/v1/equipos`
+
+Returns active `DmEquipo` records ordered by `codigo`. A default result limit is applied automatically.
+
+### Query parameters
+
+<ParamField query="ubicacion_tecnica_id" type="integer">
+  Filter equipment to a specific technical location ID. When this parameter is provided, the default limit rises to `500`.
+</ParamField>
+
+<ParamField query="q" type="string">
+  Search term. Partial-match on `codigo` and `nombre`.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  Maximum number of records to return. Capped at `1000`. Defaults to `500` when `ubicacion_tecnica_id` is provided, `50` otherwise.
+</ParamField>
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="DmEquipo">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="codigo" type="string">Equipment code.</ResponseField>
+    <ResponseField name="nombre" type="string">Equipment name.</ResponseField>
+    <ResponseField name="ubicacion_tecnica_id" type="integer | null">ID of the associated technical location.</ResponseField>
+    <ResponseField name="area" type="string | null">Area or zone within the location.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the equipment record is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/equipos?ubicacion_tecnica_id=201&q=RTR" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 88,
+      "codigo": "RTR-NORTE-01",
+      "nombre": "Router perimetral norte",
+      "ubicacion_tecnica_id": 201,
+      "area": "Rack A",
+      "activo": true
+    }
+  ]
+}
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |

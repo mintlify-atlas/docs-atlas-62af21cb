@@ -1,0 +1,114 @@
+---
+title: "External systems"
+description: "Register external ticketing or folio systems and configure the regex patterns used to validate folio numbers on logbook entries."
+---
+
+External systems are the third-party platforms (ITSM tools, event registries, licensing systems) whose ticket or folio numbers operators attach to logbook entries as cross-references. Each system defines a regex pattern that validates folio format at entry time.
+
+The `SistemaExterno` model stores records in the `sistemas_externos` table. The `ReferenciaExterna` model links a specific external folio (`externo_id`) from a given system to a logbook entry.
+
+## Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `codigo` | string | Yes | Unique machine-readable identifier (e.g., `CONQUEST`). |
+| `nombre` | string | Yes | Human-readable name shown in the entry form. |
+| `patron_regex` | string | No | PCRE regex pattern used to validate the folio value entered by the operator. |
+| `activo` | boolean | Yes | Only active systems appear in the entry form. |
+
+## Regex folio validation
+
+When an operator adds an external reference to an entry, the UI validates the entered folio against `patron_regex`. If the folio does not match, the entry cannot be saved with that reference.
+
+<AccordionGroup>
+  <Accordion title="Numeric folio (up to 12 digits)">
+    Pattern: `^\d{1,12}$`
+
+    Used by: **Eventos RNFO**, **Incidentes Clientes**.
+
+    Valid examples: `1`, `123456`, `999999999999`.
+  </Accordion>
+  <Accordion title="NCI/NCR prefix pattern">
+    Pattern: `^(?:NCI|NCR)-\d{1,12}$`
+
+    Used by: **ConQuest NCI/NCR**.
+
+    Valid examples: `NCI-1234`, `NCR-000000042`.
+  </Accordion>
+  <Accordion title="YYYYMMDD-NNNN date-number pattern">
+    Pattern: `^\d{8}-\d{4}$`
+
+    Used by: Solicitudes and Licencias (COReFO/CONaFO, ZOT, CCD).
+
+    Valid example: `20260314-0001`.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+If `patron_regex` is left empty, the UI accepts any non-empty string as a valid folio.
+</Note>
+
+## Default systems
+
+The `SistemasExternosSeeder` seeds the following systems on fresh installations:
+
+| Código | Nombre | Patrón |
+|---|---|---|
+| `EVENTOS_RNFO` | Eventos RNFO | `^\d{1,12}$` |
+| `INCIDENTES_CLIENTES` | Incidentes Clientes | `^\d{1,12}$` |
+| `CONQUEST` | ConQuest NCI/NCR | `^(?:NCI\|NCR)-\d{1,12}$` |
+| `SOLICITUD_COMUNICACIONES` | Solicitud COReFO/CONaFO | `^\d{8}-\d{4}$` |
+| `LICENCIA_COMUNICACIONES` | Licencia COReFO/CONaFO | `^\d{8}-\d{4}$` |
+| `SOLICITUD_ZOT` | Solicitud Zona de Operación de Transmisión | `^\d{8}-\d{4}$` |
+| `LICENCIA_ZOT` | Licencia Zona de Operación de Transmisión | `^\d{8}-\d{4}$` |
+| `SOLICITUD_CCD` | Solicitud Centro de Control de Distribución | `^\d{8}-\d{4}$` |
+| `LICENCIA_CCD` | Licencia Centro de Control de Distribución | `^\d{8}-\d{4}$` |
+
+## Admin management UI
+
+Navigate to **Administración > Sistemas Externos** (`/sistemas-externos`). The page shows a single paginated table with search (by name, code, or pattern) and status filter.
+
+### Creating a system
+
+<Steps>
+  <Step title="Open the form">
+    Click **Nuevo Sistema**.
+  </Step>
+  <Step title="Fill in the required fields">
+    Enter a unique **Código** and a **Nombre**.
+  </Step>
+  <Step title="Set the validation pattern">
+    Enter a **Patrón regex** in the text field. The field uses monospace font to help you review the expression. Leave it empty to skip folio format validation.
+  </Step>
+  <Step title="Set the status">
+    Choose **Activo** to make the system available in the entry form immediately.
+  </Step>
+  <Step title="Save">
+    Click **Crear sistema**.
+  </Step>
+</Steps>
+
+### Editing a system
+
+Click the edit icon on the system's row. All fields are editable. Click **Guardar cambios** to apply.
+
+### Deleting a system
+
+The delete icon is disabled when the system is tagged **En uso** (at least one entry references it). Deactivate the system instead of deleting it in that case.
+
+## API routes
+
+Public endpoint — returns all **active** systems (no authentication required):
+
+```http
+GET /api/v1/sistemas-externos
+```
+
+Admin CRUD (requires `administrador` role):
+
+```http
+GET    /api/v1/admin/sistemas-externos
+POST   /api/v1/admin/sistemas-externos
+PUT    /api/v1/admin/sistemas-externos/{sistema}
+DELETE /api/v1/admin/sistemas-externos/{sistema}
+```

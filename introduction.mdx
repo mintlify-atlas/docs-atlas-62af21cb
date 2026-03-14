@@ -1,0 +1,72 @@
+---
+title: "Introduction"
+description: "Bitácora Operativa — a web application for recording, publishing, and querying operational events with NMS/EMS inventory integration."
+---
+
+# Bitácora Operativa
+
+Bitácora Operativa is a full-stack web application designed for operations teams to log, track, and publish operational events. It integrates with NMS/EMS inventory systems, supports SAP-like technical locations and equipment hierarchies, and provides a complete audit trail with role-based access control.
+
+## What you can do with Bitácora
+
+<CardGroup cols={2}>
+  <Card title="Operational Logbook" icon="book" href="/guides/entries">
+    Create and publish operational event entries with rich text, attachments, and external ticket references.
+  </Card>
+  <Card title="Public Timeline" icon="timeline" href="/guides/timeline">
+    View a chronological feed of published operational events — optionally accessible without login.
+  </Card>
+  <Card title="NMS/EMS Inventory" icon="network-wired" href="/guides/inventory-overview">
+    Manage your network inventory of elements, domains, and networks with CSV import support.
+  </Card>
+  <Card title="Technical Locations" icon="location-dot" href="/guides/locations-equipment">
+    Maintain SAP-like hierarchies of technical locations and associated equipment.
+  </Card>
+  <Card title="PM Matrix" icon="table" href="/guides/pm-matrix">
+    Configure work order class / activity class combinations for preventive maintenance classification.
+  </Card>
+  <Card title="REST API" icon="code" href="/api/authentication">
+    Integrate with external systems via a versioned REST API protected by Laravel Sanctum.
+  </Card>
+</CardGroup>
+
+## Key capabilities
+
+- **Draft/publish workflow** — entries start as drafts and are published explicitly by operators or administrators
+- **Role-based access** — three access levels: public read, operator, and administrator
+- **Rich attachments** — WYSIWYG editor with inline images (normalized to PNG) and file attachments
+- **External references** — link entries to external tickets/folios validated by configurable regex patterns
+- **CSV import rules** — define and execute import rules to load NMS/EMS inventory data from CSV files
+- **Rate limiting** — configurable per-environment API and login rate limits
+- **Configurable public access** — the public timeline can be toggled on/off from system configuration
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Laravel 10 (PHP 8.1+) |
+| Frontend | Vue 3 + Vite (SPA) |
+| Database | MySQL 8 |
+| Authentication | Laravel Sanctum (session + CSRF) |
+| Authorization | Spatie Roles/Permissions |
+| Editor | Tiptap (WYSIWYG) |
+| Charts | Chart.js |
+
+## User roles
+
+| Role | Capabilities |
+|---|---|
+| **Public** | Read published entries, view catalogs, view inventory elements |
+| **Operator** | All public + create/edit/delete entries, upload attachments, manage own profile |
+| **Administrator** | All operator + manage catalogs, PM matrix, inventory, users, system configuration |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get a local development environment running in minutes.
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Understand how Laravel and Vue work together in this application.
+  </Card>
+</CardGroup>

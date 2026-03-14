@@ -1,0 +1,208 @@
+---
+title: "CSV import rules"
+description: "Define import rules to load NMS/EMS inventory data from CSV files, execute imports, review execution history, and revert if needed."
+---
+
+Import rules let you map columns in a CSV (or similar delimited file) exported from an NMS or EMS system to the fields of the `inv_elementos_redes` table and its type-specific extension tables. Once a rule is configured, you can execute it against a file to create or update elements in bulk.
+
+Navigate to **Administración → Reglas de Importación** (`/importaciones-reglas`) to manage rules and run imports.
+
+## What an import rule contains
+
+A **regla de importación** (`inv_import_reglas`) defines everything needed to parse a file and map its columns to the inventory model:
+
+| Field | Description |
+|---|---|
+| `red_id` | The network this rule targets |
+| `nombre` | Descriptive name for the rule (unique per network) |
+| `tipo_elemento` | Element type to import: `nodo`, `enlace`, `servicio`, or `tunel` |
+| `tabla_destino` | Always `inv_elementos_redes` |
+| `archivo_patron` | Optional glob pattern to suggest which file to use (e.g., `*datos.csv`) |
+| `delimitador` | Single character column delimiter (default `,`) |
+| `usa_comillas` | Whether fields are quoted (default `true`) |
+| `tiene_encabezado` | Whether the first row is a header (default `false`) |
+| `encoding` | File encoding (default `utf-8`) |
+| `activo` | Whether the rule appears in the import selector |
+
+### Column mappings (campos)
+
+Each rule has one or more `inv_import_regla_campos` records that map a source column to a destination field:
+
+| Field | Description |
+|---|---|
+| `columna_fuente` | Column header name (when `tiene_encabezado = true`) or 1-based index |
+| `campo_destino` | Destination field name (e.g., `codigo`, `nombre`, `ne_id`) |
+| `transformacion` | Optional pipe-separated transformations, e.g., `trim\|upper\|to_int` |
+| `por_defecto` | Static default value if the source column is empty |
+| `es_clave_upsert` | Whether this field is used as the upsert key |
+| `orden` | Processing order |
+| `activo` | Whether this mapping is active |
+
+The UI pre-populates the available destination fields based on the selected `tipo_elemento`. For example, selecting `nodo` shows fields from both `inv_elementos_redes` (`codigo`, `nombre`, `observaciones`) and `inv_detalle_nodos` (`ne_id`, `ne_dbid`, `dn_externo`, `native_name`, `user_label`, `nombre_producto`, `tipo_equipo`, `version_me`, `direccion_red`, `nombre_grupo`).
+
+## Creating and editing rules
+
+From the **Importación de Inventario** page, click **Nueva regla** to open the rule editor. Fill in the network, name, element type, file format settings, and column mappings. Click **Crear regla** to save.
+
+To edit an existing rule, click the edit icon in the rules table. Note that updating a rule replaces all its column mappings atomically in a single database transaction.
+
+<Warning>
+  You cannot delete a rule that has at least one import execution associated with it. The API returns HTTP 422 with the message `No se puede eliminar la regla porque tiene importaciones asociadas.`
+</Warning>
+
+### Admin API for rules
+
+| Action | Endpoint |
+|---|---|
+| List | `GET /api/v1/admin/inventario/import-reglas` |
+| Create | `POST /api/v1/admin/inventario/import-reglas` |
+| Update | `PUT /api/v1/admin/inventario/import-reglas/{regla}` |
+| Delete | `DELETE /api/v1/admin/inventario/import-reglas/{regla}` |
+
+Pass `?red_id={id}` to the list endpoint to filter rules by network.
+
+## Executing an import
+
+<Steps>
+  <Step title="Select a network">
+    In the **Ejecutar Importación** panel, choose the target network from the **Red** dropdown. Only networks with at least one active rule appear.
+  </Step>
+  <Step title="Select a rule">
+    Choose the import rule from the **Regla** dropdown. The selector shows only active rules for the selected network, with the element type in parentheses. If the rule has an `archivo_patron`, it appears as a hint next to the file picker.
+  </Step>
+  <Step title="Upload the file">
+    Click the file picker and choose your CSV or delimited file (accepted extensions: `.dat`, `.csv`, `.txt`, `.lst`). The file is uploaded as `multipart/form-data`.
+  </Step>
+  <Step title="Confirm and execute">
+    Click **Ejecutar Importación**. A confirmation dialog summarizes the selected network, rule, element type, and the reversion policy before proceeding.
+
+    The system calls `POST /api/v1/admin/inventario/importaciones/ejecutar` with the following fields:
+
+    ```http
+    POST /api/v1/admin/inventario/importaciones/ejecutar
+    Content-Type: multipart/form-data
+
+    red_id=<id>
+    regla_id=<id>
+    archivo=<file>
+    ```
+
+    The uploaded file is stored under `storage/app/imports/manual/`.
+  </Step>
+  <Step title="Review results">
+    After execution, the **Últimas ejecuciones** table updates with the new entry showing status, processed/created/updated/decommissioned counts, and any errors.
+  </Step>
+</Steps>
+
+<Warning>
+  Running a new import for the same network and element type may remove the reversion option from the previous execution. Review the reversion policy in the confirmation dialog before proceeding.
+</Warning>
+
+## Import execution states
+
+Each execution record (`inv_importaciones_redes`) transitions through the following states:
+
+| State | Meaning |
+|---|---|
+| `procesando` | Import is running |
+| `completado` | Import finished successfully |
+| `fallido` | Import threw an unhandled exception |
+
+The execution record tracks: `total_registros`, `procesados`, `creados`, `actualizados`, and `marcados_baja`.
+
+## Reviewing execution history
+
+The **Últimas ejecuciones** table on the **Importación de Inventario** page lists the 100 most recent executions ordered by date descending. You can see:
+
+- Date and time of execution
+- Network and rule used
+- Original file name
+- Execution status
+- Processed/created/updated counts
+- Error count (click **Ver errores** to inspect details)
+- Reversion status badge
+
+### Viewing import errors
+
+If an execution has errors, click **Ver errores** to open the errors modal. The system calls:
+
+```http
+GET /api/v1/admin/inventario/importaciones/{importacion}/errores?limit=200
+```
+
+The response includes each error row with the following fields:
+
+| Field | Description |
+|---|---|
+| `fila_numero` | Row number in the source file |
+| `campo` | Field that caused the error |
+| `valor` | Raw value that was rejected |
+| `mensaje` | Error description |
+
+When there are more errors than the display limit (200), the modal shows a note with the total count.
+
+## Reverting an import
+
+You can revert an import to remove the elements it created. Reversion only deletes elements with `origen = csv` that were created during that specific execution window and whose `last_seen_importacion_id` matches the execution being reverted.
+
+<Warning>
+  Reversion is **destructive and irreversible**. It permanently deletes the elements created by that execution. You cannot revert an execution if any of its created elements are linked to logbook entries.
+</Warning>
+
+The **Revertir** button is shown only for the latest revertible execution per network and element type. Click it to confirm and trigger:
+
+```http
+POST /api/v1/admin/inventario/importaciones/{importacion}/revertir
+```
+
+The API enforces the following conditions before performing the reversion:
+
+- The execution must have `estado = completado`.
+- It must be the most recent execution with revertible elements for that network and element type.
+- No later execution for the same network and type can be in `procesando` state.
+- None of the elements to be deleted can be linked to logbook entries.
+
+A successful response returns:
+
+```json
+{
+  "message": "Reversión completada.",
+  "eliminados": 42,
+  "red_id": 3,
+  "tipo_elemento": "nodo"
+}
+```
+
+## File storage and cleanup
+
+Uploaded import files are stored at `storage/app/imports/manual/`. To remove old files and free disk space, run:
+
+```bash
+php artisan imports:cleanup --hours=24
+```
+
+The `--hours` option (default `24`) sets the minimum age in hours. Files older than that threshold are deleted, including both referenced files (tracked in the database) and orphaned files (not referenced by any execution record). Import execution records with deleted files have their `fuente` field cleared.
+
+Use `--dry-run` to preview what would be deleted without making changes:
+
+```bash
+php artisan imports:cleanup --hours=24 --dry-run
+```
+
+You can also trigger cleanup via the admin API:
+
+```http
+POST /api/v1/admin/mantenimiento/importaciones-archivos/cleanup
+```
+
+## SAP ZPM017 import
+
+The system includes a separate import path for SAP-style equipment data (ZPM017 format). This import targets the `dm_ubicaciones_tecnicas` and `dm_equipos` tables — not the NMS/EMS inventory — and is managed through:
+
+```http
+POST /api/v1/admin/dm/importar-zpm017
+```
+
+<Note>
+  The ZPM017 import is a distinct workflow from the CSV import rules described on this page. It operates on the master data (datos maestros) domain, not the network inventory. See the SAP master data documentation for field mapping details.
+</Note>

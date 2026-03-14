@@ -1,0 +1,211 @@
+---
+title: "User configuration"
+description: "Retrieve your user profile, manage personal configuration settings, and change your password."
+---
+
+<Note>
+All endpoints in this section require authentication via a Sanctum bearer token. The `operador` or `administrador` role is required for configuration endpoints. The `GET /api/v1/me` endpoint requires only authentication.
+</Note>
+
+## Get current user profile
+
+```bash
+GET /api/v1/me
+```
+
+Returns the authenticated user's profile and role list.
+
+### Example
+
+```bash
+curl https://example.com/api/v1/me \
+  -H "Authorization: Bearer {token}"
+```
+
+### Response
+
+```json
+{
+  "id": 7,
+  "nombre": "Ana García",
+  "correo": "ana@example.com",
+  "activo": true,
+  "estatus_actual": "Base",
+  "rpe": "A0001",
+  "rtt": null,
+  "ultimo_acceso": "2026-03-14T08:00:00.000000Z",
+  "roles": ["operador"],
+  "has_historial": true,
+  "historial_counts": {
+    "entradas": 12,
+    "adjuntos": 5,
+    "importaciones": 0,
+    "configuracion": 2
+  },
+  "created_at": "2025-01-15T09:00:00.000000Z",
+  "updated_at": "2026-03-14T08:00:00.000000Z"
+}
+```
+
+---
+
+## List user configuration settings
+
+```bash
+GET /api/v1/configuracion/usuario
+```
+
+Returns all configuration entries belonging to the authenticated user, ordered by `clave`.
+
+### Response
+
+Returns an array of `ConfiguracionUsuarioResource` objects.
+
+---
+
+## Create user configuration setting
+
+```bash
+POST /api/v1/configuracion/usuario
+```
+
+### Request body
+
+<ParamField body="clave" type="string" required>
+  Configuration key. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="valor" type="string" required>
+  Configuration value. Maximum 255 characters. When `clave` is `tema.modo`, allowed values are `dark`, `light`, or `global`.
+</ParamField>
+
+<ParamField body="tipo" type="string" required>
+  Data type of the value. Allowed values: `int`, `bool`, `string`.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional human-readable description. Maximum 255 characters.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/configuracion/usuario \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clave": "tema.modo",
+    "valor": "dark",
+    "tipo": "string",
+    "descripcion": "Preferred UI theme"
+  }'
+```
+
+### Response
+
+Returns the created `ConfiguracionUsuarioResource` object.
+
+---
+
+## Update user configuration setting
+
+```bash
+PUT /api/v1/configuracion/usuario/{configuracion}
+```
+
+You can only update settings that belong to you. Attempting to update another user's setting returns `403`.
+
+### Request body
+
+All fields are optional (`sometimes`).
+
+<ParamField body="valor" type="string">
+  New value. Maximum 255 characters. When the setting's `clave` is `tema.modo`, allowed values are `dark`, `light`, or `global`.
+</ParamField>
+
+<ParamField body="tipo" type="string">
+  Updated data type. Allowed values: `int`, `bool`, `string`.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Updated description. Maximum 255 characters.
+</ParamField>
+
+### Response
+
+Returns the updated `ConfiguracionUsuarioResource` object.
+
+---
+
+## Change password
+
+```bash
+PUT /api/v1/configuracion/usuario/password
+```
+
+<Warning>
+  This route must be registered before `PUT /api/v1/configuracion/usuario/{configuracion}` in the router to avoid path collision. The routes file defines it in the correct order.
+</Warning>
+
+### Request body
+
+<ParamField body="current_password" type="string" required>
+  Your current password. Validated against the stored hash.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Your new password. Must satisfy Laravel's default password rules, must be confirmed, and must differ from `current_password`.
+</ParamField>
+
+<ParamField body="password_confirmation" type="string" required>
+  Must match `password`.
+</ParamField>
+
+### Example
+
+```bash
+curl -X PUT https://example.com/api/v1/configuracion/usuario/password \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_password": "old-secret",
+    "password": "new-secure-password",
+    "password_confirmation": "new-secure-password"
+  }'
+```
+
+### Response
+
+```json
+{
+  "message": "Contraseña actualizada correctamente."
+}
+```
+
+---
+
+## Configuration setting object
+
+<ResponseField name="id" type="integer">Unique setting ID.</ResponseField>
+<ResponseField name="clave" type="string">Configuration key.</ResponseField>
+<ResponseField name="valor" type="string">Configuration value.</ResponseField>
+<ResponseField name="tipo" type="string">Value data type: `int`, `bool`, or `string`.</ResponseField>
+<ResponseField name="descripcion" type="string">Optional description (nullable).</ResponseField>
+
+---
+
+## User object
+
+<ResponseField name="id" type="integer">Unique user ID.</ResponseField>
+<ResponseField name="nombre" type="string">Full name.</ResponseField>
+<ResponseField name="correo" type="string">Email address.</ResponseField>
+<ResponseField name="activo" type="boolean">Whether the account is active.</ResponseField>
+<ResponseField name="estatus_actual" type="string">`Temporal` or `Base`.</ResponseField>
+<ResponseField name="rpe" type="string">RPE identifier (nullable).</ResponseField>
+<ResponseField name="rtt" type="string">RTT identifier (nullable).</ResponseField>
+<ResponseField name="ultimo_acceso" type="string">Last login timestamp (nullable).</ResponseField>
+<ResponseField name="roles" type="array">List of role names assigned to the user (when loaded).</ResponseField>
+<ResponseField name="has_historial" type="boolean">Whether the user has any associated entries, attachments, imports, or settings.</ResponseField>
+<ResponseField name="historial_counts" type="object">Counts of entries, adjuntos, importaciones, and configuracion records.</ResponseField>
+<ResponseField name="created_at" type="string">Account creation timestamp.</ResponseField>
+<ResponseField name="updated_at" type="string">Last account update timestamp.</ResponseField>

@@ -1,0 +1,168 @@
+---
+title: "Inventory elements (public)"
+description: "List active network inventory elements including nodes, links, services, and tunnels."
+---
+
+The inventory endpoint exposes active network elements from the operational inventory. No authentication is required.
+
+---
+
+## List inventory elements
+
+`GET /api/v1/inventario/elementos`
+
+Returns a flat (non-paginated) array of active `InvElementoRed` records ordered by `codigo`. Each element includes its parent network (`red`), domain list, and type-specific detail fields.
+
+### Query parameters
+
+<ParamField query="red_id" type="integer">
+  Filter elements belonging to a specific network ID.
+</ParamField>
+
+<ParamField query="q" type="string">
+  Search term. Matches against `codigo`, `nombre`, and `tipo` using a partial (`LIKE`) match.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="(none)">
+  Maximum number of records to return. Capped at `1000`.
+</ParamField>
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="InvElementoRed" defaultOpen>
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="red_id" type="integer">Parent network ID.</ResponseField>
+    <ResponseField name="red" type="object">
+      Parent network and its domains.
+      <Expandable title="red">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="codigo" type="string" />
+        <ResponseField name="nombre" type="string" />
+        <ResponseField name="dominios" type="object[]">
+          <Expandable title="dominio">
+            <ResponseField name="id" type="integer" />
+            <ResponseField name="codigo" type="string" />
+            <ResponseField name="nombre" type="string" />
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="tipo" type="string">Element type: `nodo`, `enlace`, `servicio`, or `tunel`.</ResponseField>
+    <ResponseField name="codigo" type="string">Element code.</ResponseField>
+    <ResponseField name="nombre" type="string">Element name.</ResponseField>
+    <ResponseField name="estado" type="string">Always `activo` in this endpoint.</ResponseField>
+    <ResponseField name="origen" type="string | null">Source system that created this record.</ResponseField>
+    <ResponseField name="observaciones" type="string | null">Free-text notes.</ResponseField>
+    <ResponseField name="fecha_alta" type="string | null">Date the element was registered (ISO 8601).</ResponseField>
+    <ResponseField name="fecha_baja" type="string | null">Date the element was decommissioned (ISO 8601), or `null`.</ResponseField>
+    <ResponseField name="updated_at_fuente" type="string | null">Last update timestamp from the source system.</ResponseField>
+    <ResponseField name="detalle_nodo" type="object | null">
+      Present only when `tipo` is `nodo`.
+      <Expandable title="detalle_nodo">
+        <ResponseField name="ne_id" type="string | null" />
+        <ResponseField name="ne_dbid" type="string | null" />
+        <ResponseField name="dn_externo" type="string | null" />
+        <ResponseField name="native_name" type="string | null" />
+        <ResponseField name="user_label" type="string | null" />
+        <ResponseField name="nombre_producto" type="string | null" />
+        <ResponseField name="tipo_equipo" type="string | null" />
+        <ResponseField name="version_me" type="string | null" />
+        <ResponseField name="direccion_red" type="string | null" />
+        <ResponseField name="nombre_grupo" type="string | null" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="detalle_enlace" type="object | null">
+      Present only when `tipo` is `enlace`.
+      <Expandable title="detalle_enlace">
+        <ResponseField name="instancia_enlace_id" type="string | null" />
+        <ResponseField name="motlink_label" type="string | null" />
+        <ResponseField name="trail_id" type="string | null" />
+        <ResponseField name="nodo_a_ne_id" type="string | null" />
+        <ResponseField name="nodo_z_ne_id" type="string | null" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="detalle_servicio" type="object | null">
+      Present only when `tipo` is `servicio`.
+      <Expandable title="detalle_servicio">
+        <ResponseField name="instancia_servicio_id" type="string | null" />
+        <ResponseField name="user_label" type="string | null" />
+        <ResponseField name="cliente" type="string | null" />
+        <ResponseField name="tipo_servicio" type="string | null" />
+        <ResponseField name="ethvpn_id" type="string | null" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="detalle_tunel" type="object | null">
+      Present only when `tipo` is `tunel`.
+      <Expandable title="detalle_tunel">
+        <ResponseField name="instancia_tunel_id" type="string | null" />
+        <ResponseField name="user_label" type="string | null" />
+        <ResponseField name="cliente" type="string | null" />
+        <ResponseField name="tipo_tunel" type="string | null" />
+        <ResponseField name="ethvpn_id" type="string | null" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="entradas_count" type="integer">Number of log entries linked to this element.</ResponseField>
+    <ResponseField name="in_use" type="boolean">`true` when `entradas_count` is greater than zero.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/inventario/elementos?q=NORTE&limit=10" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 101,
+      "red_id": 3,
+      "red": {
+        "id": 3,
+        "codigo": "RED-METRO",
+        "nombre": "Red Metropolitana",
+        "dominios": [
+          { "id": 5, "codigo": "DOM-A", "nombre": "Dominio Acceso" }
+        ]
+      },
+      "tipo": "nodo",
+      "codigo": "NE-NORTE-01",
+      "nombre": "Nodo principal norte",
+      "estado": "activo",
+      "origen": "NMS",
+      "observaciones": null,
+      "fecha_alta": "2022-06-15",
+      "fecha_baja": null,
+      "updated_at_fuente": "2024-02-20T14:00:00.000000Z",
+      "detalle_nodo": {
+        "ne_id": "NE-12345",
+        "ne_dbid": "db-9988",
+        "dn_externo": null,
+        "native_name": "NORTE-01",
+        "user_label": "Nodo Norte 01",
+        "nombre_producto": "RouterOS X",
+        "tipo_equipo": "PE",
+        "version_me": "7.1.3",
+        "direccion_red": "10.0.1.1",
+        "nombre_grupo": "Grupo-Norte"
+      },
+      "detalle_enlace": null,
+      "detalle_servicio": null,
+      "detalle_tunel": null,
+      "entradas_count": 4,
+      "in_use": true
+    }
+  ]
+}
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |

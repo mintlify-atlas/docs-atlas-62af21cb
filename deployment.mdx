@@ -1,0 +1,252 @@
+---
+title: "Production deployment"
+description: "How to deploy Bitácora Operativa to a production server: pre-checklist, first deployment, updates, and scheduled maintenance."
+---
+
+## Pre-checklist
+
+Verify each item before you begin deployment.
+
+<Check>PHP 8.1+ is installed on the server with all required extensions (see [PHP extensions](#php-extensions) below).</Check>
+<Check>Composer is installed and accessible from the command line.</Check>
+<Check>Node.js 20+ and npm are available for building frontend assets.</Check>
+<Check>MySQL 8 is running and you have a dedicated database and user for the application.</Check>
+<Check>A web server (Nginx or Apache) is configured with its document root pointing to the `public/` directory.</Check>
+<Check>`.env` is configured with production values (see below).</Check>
+<Check>Rate limiting is enabled in `.env`.</Check>
+<Check>Default seed passwords have been changed after first login.</Check>
+
+### Required `.env` production values
+
+<Warning>
+  Deploying without these settings can expose internal errors, bypass rate limits, or break asset and session handling.
+</Warning>
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.example.com
+
+DB_HOST=your-db-host
+DB_DATABASE=your-db-name
+DB_USERNAME=your-db-user
+DB_PASSWORD=your-db-password
+
+RATE_LIMIT_API_ENABLED=true
+RATE_LIMIT_LOGIN_ENABLED=true
+```
+
+Also configure `SESSION_DRIVER`, `CACHE_DRIVER`, and `MAIL_*` to match your production infrastructure.
+
+### PHP extensions
+
+The following PHP extensions are required:
+
+```
+mysqlnd, opcache, pdo, pdo_mysql, xml, calendar, ctype, curl, dom,
+exif, ffi, fileinfo, ftp, gd, gettext, iconv, mbstring, mysqli,
+phar, posix, readline, shmop, simplexml, sockets, sysvmsg,
+sysvsem, sysvshm, tokenizer, xmlreader, xmlwriter, xsl, zip
+```
+
+<Note>
+  The **`gd`** extension is required for image processing. Attachments uploaded as images are normalized to PNG by the application.
+</Note>
+
+## First deployment
+
+<Steps>
+  <Step title="Clone the repository and configure .env">
+    Clone the repository to your server and copy the environment file:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit `.env` with your production values before proceeding.
+  </Step>
+
+  <Step title="Install PHP and Node dependencies">
+    <CodeGroup>
+
+    ```bash PHP
+    composer install --no-dev --optimize-autoloader
+    ```
+
+    ```bash Node
+    npm ci
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Generate the application key">
+    ```bash
+    php artisan key:generate
+    ```
+  </Step>
+
+  <Step title="Build frontend assets">
+    ```bash
+    npm run build
+    ```
+
+    This compiles and fingerprints all Vue/JS/CSS assets into `public/build/`.
+  </Step>
+
+  <Step title="Create the storage symlink">
+    ```bash
+    php artisan storage:link
+    ```
+  </Step>
+
+  <Step title="Run migrations and seed base data">
+    ```bash
+    php artisan migrate --force
+    php artisan db:seed --force
+    ```
+
+    `--force` is required when `APP_ENV=production` to confirm the operation.
+  </Step>
+
+  <Step title="Cache configuration, routes, and views">
+    ```bash
+    php artisan optimize:clear
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+    ```
+
+    Run `optimize:clear` before the cache commands to ensure no stale cache files are present.
+  </Step>
+
+  <Step title="Change default passwords">
+    Log in as `admin@bitacora.test` and `operador@bitacora.test` and change both passwords from the default `12345678`.
+
+    <Warning>
+      Do not skip this step. The default credentials are publicly documented and must be changed before the application handles real data.
+    </Warning>
+  </Step>
+</Steps>
+
+## Update / release procedure
+
+Follow these steps for every subsequent code release.
+
+<Steps>
+  <Step title="Pull the new code">
+    Deploy the updated source to the server (git pull, artifact copy, or your deployment tool of choice).
+  </Step>
+
+  <Step title="Update dependencies (if changed)">
+    <CodeGroup>
+
+    ```bash PHP
+    composer install --no-dev --optimize-autoloader
+    ```
+
+    ```bash Node
+    npm ci
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Rebuild frontend assets">
+    ```bash
+    npm run build
+    ```
+  </Step>
+
+  <Step title="Run new migrations">
+    ```bash
+    php artisan migrate --force
+    ```
+  </Step>
+
+  <Step title="Refresh caches">
+    ```bash
+    php artisan optimize:clear
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+    ```
+  </Step>
+</Steps>
+
+## Scheduled maintenance
+
+Set up two cron jobs to keep attachments and import files tidy.
+
+### Attachment cleanup
+
+Removes temporary attachments (not linked to any entry) and orphaned files on disk older than the specified threshold:
+
+```bash
+# Preview what would be deleted
+php artisan adjuntos:cleanup --hours=24 --dry-run
+
+# Run the cleanup
+php artisan adjuntos:cleanup --hours=24
+```
+
+### Import file cleanup
+
+Removes old CSV source files from `storage/app/imports/` (both referenced and orphaned):
+
+```bash
+# Preview what would be deleted
+php artisan imports:cleanup --hours=24 --dry-run
+
+# Run the cleanup
+php artisan imports:cleanup --hours=24
+```
+
+### Recommended cron schedule
+
+Add these entries to your server's crontab:
+
+```bash
+# Daily cleanup of temporary attachments and orphaned files
+0 2 * * * /usr/bin/php /path/to/app/artisan adjuntos:cleanup --hours=24
+
+# Daily cleanup of old import source files
+0 3 * * * /usr/bin/php /path/to/app/artisan imports:cleanup --hours=24
+```
+
+If you add more scheduled tasks in the future, you can consolidate them under Laravel's scheduler:
+
+```bash
+# Run Laravel scheduler every minute
+* * * * * /usr/bin/php /path/to/app/artisan schedule:run >> /dev/null 2>&1
+```
+
+<Note>
+  Both cleanup commands are also available from the application UI at **Configuración → Configuración del sistema → Mantenimiento** (administrator only).
+</Note>
+
+## Rate limiting in production
+
+<Warning>
+  Rate limiting is disabled by default in `.env.example`. You must explicitly enable both limiters in production to protect the API and login endpoints from abuse.
+</Warning>
+
+Set these variables in your production `.env`:
+
+```env
+RATE_LIMIT_API_ENABLED=true
+RATE_LIMIT_API_MAX_ATTEMPTS=60
+RATE_LIMIT_API_DECAY_MINUTES=1
+
+RATE_LIMIT_LOGIN_ENABLED=true
+RATE_LIMIT_LOGIN_MAX_ATTEMPTS=5
+RATE_LIMIT_LOGIN_DECAY_SECONDS=60
+```
+
+Then clear caches:
+
+```bash
+php artisan optimize:clear
+```
+
+See [Configuration](/configuration#rate-limiting) for a full description of each variable.

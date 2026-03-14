@@ -1,0 +1,175 @@
+---
+title: "Inventory management"
+description: "Manage the NMS/EMS network inventory catalog: networks, domains, and elements organized in a three-level hierarchy."
+---
+
+The inventory module stores the NMS/EMS element catalog that operators can attach to logbook entries. It uses a three-level hierarchy: **Red** (network) → **Dominio** (domain) → **Elemento** (element).
+
+## Hierarchy overview
+
+<CardGroup cols={3}>
+  <Card title="Red (network)" icon="network-wired">
+    Top-level container. Represents a physical or logical communications network (e.g., an NMS or EMS domain). Each network has a unique `codigo`, a `nombre`, optional domains, and an `activo` flag.
+  </Card>
+  <Card title="Dominio (domain)" icon="folder-tree">
+    Technology grouping used to classify networks. A network can belong to multiple domains. Domains have a `codigo`, `nombre`, `orden`, and `activo` flag.
+  </Card>
+  <Card title="Elemento (element)" icon="server">
+    An individual inventory item (node, link, service, or tunnel) that belongs to exactly one network. Elements are the objects operators associate with logbook entries.
+  </Card>
+</CardGroup>
+
+The many-to-many relationship between networks and domains is stored in the `inv_red_dominios` pivot table.
+
+## Element types
+
+Each element has a `tipo` field. The allowed values are `nodo`, `enlace`, `servicio`, `tunel`, and `trail`. Every element shares a set of common fields stored in `inv_elementos_redes`, and type-specific detail fields are stored in dedicated extension tables.
+
+### Common fields (all types)
+
+| Field | Type | Description |
+|---|---|---|
+| `red_id` | FK | Parent network |
+| `tipo` | enum | `nodo`, `enlace`, `servicio`, `tunel`, `trail` |
+| `codigo` | string | Unique identifier within the network and type |
+| `nombre` | string | Display name (optional) |
+| `estado` | enum | `activo`, `baja`, `planificado`, `desconocido` |
+| `fecha_alta` | datetime | Date the element was registered as active |
+| `fecha_baja` | datetime | Date the element was decommissioned (set when `estado = baja`) |
+| `updated_at_fuente` | datetime | Timestamp from the source NMS/EMS system |
+| `origen` | enum | `manual`, `csv`, `integracion` |
+| `observaciones` | string | Free-text notes |
+| `last_seen_importacion_id` | FK | Last CSV import execution that touched this element |
+
+### Extension fields by type
+
+<AccordionGroup>
+  <Accordion title="nodo — table: inv_detalle_nodos">
+
+  | Field | Description |
+  |---|---|
+  | `ne_id` | NE numeric ID from the NMS |
+  | `ne_dbid` | NE database ID from the NMS |
+  | `dn_externo` | External distinguished name (DN) |
+  | `native_name` | Native name (`m_nativename`) |
+  | `user_label` | User label (`ne_m_userlabel`) |
+  | `nombre_producto` | Product name (`m_productname`) |
+  | `tipo_equipo` | Equipment type (`t_oranetype_name`) |
+  | `version_me` | ME software version (`m_version`) |
+  | `direccion_red` | Management IP address (`m_networkaddress`) |
+  | `nombre_grupo` | Group name (`group_name`) |
+
+  </Accordion>
+  <Accordion title="enlace — table: inv_detalle_enlaces">
+
+  | Field | Description |
+  |---|---|
+  | `instancia_enlace_id` | Link instance ID from the NMS |
+  | `motlink_label` | Motorola link label |
+  | `trail_id` | Associated trail ID |
+  | `nodo_a_ne_id` | NE ID of the A-end node |
+  | `nodo_z_ne_id` | NE ID of the Z-end node |
+
+  </Accordion>
+  <Accordion title="servicio — table: inv_detalle_servicios">
+
+  | Field | Description |
+  |---|---|
+  | `instancia_servicio_id` | Service instance ID from the NMS |
+  | `user_label` | User label |
+  | `cliente` | Customer name |
+  | `tipo_servicio` | Service type |
+  | `ethvpn_id` | Ethernet VPN identifier |
+
+  </Accordion>
+  <Accordion title="tunel — table: inv_detalle_tuneles">
+
+  | Field | Description |
+  |---|---|
+  | `instancia_tunel_id` | Tunnel instance ID from the NMS |
+  | `user_label` | User label |
+  | `cliente` | Customer name |
+  | `tipo_tunel` | Tunnel type |
+  | `ethvpn_id` | Ethernet VPN identifier |
+
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  The `trail` type uses the same common fields as the other types but has no extension table in the current schema.
+</Note>
+
+## Associating elements with logbook entries
+
+Operators can tag one or more elements on any logbook entry. The association is stored in the `inv_entrada_elementos_red` pivot table, linking `entradas_bitacora.id` to `inv_elementos_redes.id`.
+
+An element tagged on at least one entry is considered **in use** (`in_use = true` in API responses). You cannot delete an element that is in use.
+
+## Inventory management UI
+
+Navigate to **Administración → Inventario NMS/EMS** (`/inventario-redes`) to manage the full catalog. The page has three sections:
+
+- **Redes** — lists all networks with their domains, status, and element/import counts. You can filter by name/code or by active/inactive status.
+- **Dominios** — lists all technology domains. You can filter by name/code or by active/inactive status.
+- **Elementos** — lists all elements with filters for network, type (`nodo`, `enlace`, `servicio`, `tunel`, `trail`), status (`activo`, `baja`, `planificado`, `desconocido`), origin (`manual`, `csv`, `integracion`), and usage (used/unused).
+
+All three sections support inline pagination. When you open the edit modal for a `nodo` element, the UI shows the read-only extension fields from `inv_detalle_nodos` in a detail panel.
+
+## Admin operations
+
+### Networks
+
+| Action | Endpoint |
+|---|---|
+| List | `GET /api/v1/admin/inventario/redes` |
+| Create | `POST /api/v1/admin/inventario/redes` |
+| Update | `PUT /api/v1/admin/inventario/redes/{red}` |
+| Delete | `DELETE /api/v1/admin/inventario/redes/{red}` |
+
+Required fields: `codigo` (unique, max 40 chars), `nombre` (max 120 chars). You can optionally pass `dominio_ids[]` to sync domain associations.
+
+<Warning>
+  You cannot delete a network that has associated elements or import executions. The API returns HTTP 422 with the message `No se puede eliminar: la red tiene elementos o importaciones.`
+</Warning>
+
+### Domains
+
+| Action | Endpoint |
+|---|---|
+| List | `GET /api/v1/admin/inventario/dominios` |
+| Create | `POST /api/v1/admin/inventario/dominios` |
+| Update | `PUT /api/v1/admin/inventario/dominios/{dominio}` |
+| Delete | `DELETE /api/v1/admin/inventario/dominios/{dominio}` |
+
+Required fields: `codigo` (unique, max 40 chars), `nombre` (max 120 chars). The optional `orden` integer controls display order in the UI.
+
+<Warning>
+  You cannot delete a domain that is associated with at least one network. The API returns HTTP 422 with the message `No se puede eliminar: dominio en uso.`
+</Warning>
+
+### Elements
+
+| Action | Endpoint |
+|---|---|
+| List | `GET /api/v1/admin/inventario/elementos` |
+| Create | `POST /api/v1/admin/inventario/elementos` |
+| Update | `PUT /api/v1/admin/inventario/elementos/{elemento}` |
+| Delete | `DELETE /api/v1/admin/inventario/elementos/{elemento}` |
+
+Required fields for creation: `red_id`, `tipo`, `codigo`. The `tipo` field is immutable after creation to preserve data integrity across extension tables. When you create an element manually, the system sets `origen = manual` and records `fecha_alta = now()`.
+
+<Warning>
+  You cannot delete an element that is linked to at least one logbook entry. The API returns HTTP 422 with the message `No se puede eliminar: el elemento está en uso.`
+</Warning>
+
+## Public read access
+
+<Note>
+  The endpoint `GET /api/v1/inventario/elementos` is **publicly accessible** — no authentication required. Use it to integrate the element catalog with external tools or display widgets without requiring a session token.
+
+  All write operations and admin list endpoints under `/api/v1/admin/inventario/` require an authenticated session with the `administrador` role.
+</Note>
+
+## Purging unused elements
+
+From the **Inventario NMS/EMS** page, click **Depurar no usados** to remove elements that have no logbook entry associations. This calls `POST /api/v1/admin/depuracion/purgar-no-usados`. The button is disabled while the operation is running.

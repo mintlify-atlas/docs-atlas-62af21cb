@@ -1,0 +1,101 @@
+---
+title: "Timeline"
+description: "Browse the public operational event timeline — a chronological list of all published logbook entries."
+---
+
+The timeline is the main landing page of Bitácora Operativa. Visiting `/` redirects you to `/timeline`, where published entries appear in reverse chronological order.
+
+## Access control
+
+Access to the timeline is governed by the `bitacora_publica` system configuration key:
+
+- **Public mode** (`bitacora_publica = true`, the default): anyone can read the timeline without logging in.
+- **Private mode** (`bitacora_publica = false`): unauthenticated visitors are redirected to `/login`. Authenticated users (any role) can always access the timeline regardless of this setting.
+
+<Info>
+  The router checks `bitacora_publica` on every navigation to `/timeline` and `/entradas/:id`. The value is cached for 60 seconds to avoid repeated API calls.
+</Info>
+
+When you are logged in, an **Ir al panel** button appears in the header. When you are not logged in, an **Iniciar Sesión** button appears instead.
+
+## What each entry card shows
+
+Each published entry is rendered as a card with the following information:
+
+| Field | Description |
+|---|---|
+| Date stamp | Day number, abbreviated month, and relative label ("Hoy", "Ayer", or month name) |
+| Start time | Formatted hour and minute of `fecha_inicio` |
+| Type badge | **OPERATIVO** (amber) or **INVENTARIO** (blue), derived from `tipo_registro` |
+| **Publicado** badge | Shown only to authenticated users |
+| Title | Clickable; navigates to `/entradas/:id` |
+| Technical summary | `resumen_tecnico` field (auto-generated) |
+| Body preview | First 200 characters of `cuerpo_texto` |
+| Criterio | Thematic criterion name, if set |
+| Impacto | Impact level name, if set |
+
+Clicking a card title navigates you to the entry detail page at `/entradas/:id`.
+
+## Filters
+
+The timeline sidebar provides two panels of filters. All filters reload the entry list from the server immediately when changed.
+
+### Left sidebar — catalog and PM-like filters
+
+**Catalog filters:**
+
+- **Criterio temático** — select a thematic criterion to show only entries tagged with it.
+- **Nivel de impacto** — select an impact level to narrow results.
+
+**Record type:**
+
+- **Operativo / Inventario** — show only operational entries, only inventory entries, or all.
+
+**PM-like filters:**
+
+- **Clase de orden** — filter by PM work order class.
+- **Clase de actividad** — becomes available after you select a clase de orden; the list is constrained to activities that belong to the selected order according to the PM matrix.
+
+**External references:**
+
+- **Folio** — free-text partial match against the `externo_id` field of linked external references (e.g. `20240206-0001`).
+
+Use **Limpiar filtros de búsqueda** to reset all catalog and PM filters at once.
+
+**Quick filters** (chip buttons below the main filters):
+
+| Chip | Behaviour |
+|---|---|
+| **Todo** | Shows all entries (default) |
+| **Fallas** | Client-side filter: keeps entries whose title, summary, body, or criterio contains the word "falla" |
+| **Anomalías** | Client-side filter: keeps entries whose title, summary, body, or criterio contains the word "anomal" |
+
+<Note>
+  Quick filter chips apply a client-side text match on already-loaded entries and do not trigger a new API request.
+</Note>
+
+### Right sidebar — date range and equipment
+
+**Rango de fechas:**
+
+- Set **Desde** and **Hasta** date pickers and click **Aplicar** to filter by `fecha_inicio`. Both dates are required together; setting only one produces a validation error.
+- Click **Limpiar** to remove the date filter.
+
+**Equipos asociados:**
+
+- **Inventario NMS/EMS** — search for network inventory elements (nodes, links, services, tunnels, trails) by code or name, then select one from the dropdown.
+- **Equipo SAP-like** — search for equipment by code or name, then select one.
+
+Use **Limpiar filtros de asociación** to clear both equipment filters.
+
+### Search bar
+
+The search bar in the header searches across title, body text, technical summary, PM order/activity names, technical location names, equipment codes/names/areas, NMS/EMS element codes/names, and linked external reference folios. Press **Enter** to run the search.
+
+## Pagination
+
+The timeline loads 20 entries per page. Click **Cargar más registros** at the bottom of the list to append the next page. The button is disabled when there are no more results.
+
+## Viewing an entry
+
+Click any entry title to open the full detail view at `/entradas/:id`. The detail view includes the full rich-text body, attached files, NMS/EMS inventory elements, external references, PM classification, and navigation links to the previous and next entries.

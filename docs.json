@@ -1,122 +1,108 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Bitácora Operativa",
+  "theme": "linden",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#2563EB",
+    "light": "#EFF6FF",
+    "dark": "#1E3A5F"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/alejandronewer/bitacora"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/alejandronewer/bitacora"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Getting Started",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Overview",
+            "pages": ["introduction", "architecture"]
+          },
+          {
+            "group": "Setup",
+            "pages": ["quickstart", "configuration", "deployment"]
+          }
+        ]
+      },
+      {
+        "tab": "User Guide",
+        "groups": [
+          {
+            "group": "Core Features",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "guides/timeline",
+              "guides/entries",
+              "guides/dashboard"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Inventory",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "guides/inventory-overview",
+              "guides/import-rules"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Administration",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/catalogs",
+              "guides/pm-matrix",
+              "guides/external-systems",
+              "guides/locations-equipment",
+              "guides/users-roles",
+              "guides/system-configuration"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Authentication",
+            "pages": ["api/authentication", "api/rate-limiting"]
+          },
+          {
+            "group": "Public Endpoints",
             "pages": [
-              "api-reference/introduction"
+              "api/entries",
+              "api/catalogs",
+              "api/inventory",
+              "api/locations",
+              "api/external-systems"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Operator Endpoints",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/entries-management",
+              "api/attachments",
+              "api/references",
+              "api/user-configuration"
+            ]
+          },
+          {
+            "group": "Admin Endpoints",
+            "pages": [
+              "api/admin-catalogs",
+              "api/admin-pm",
+              "api/admin-inventory",
+              "api/admin-locations",
+              "api/admin-users",
+              "api/admin-maintenance"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

@@ -1,0 +1,198 @@
+---
+title: "Admin: users and roles"
+description: "Create and manage user accounts and assign roles. Requires the administrador role."
+---
+
+<Warning>
+All endpoints in this section require authentication via a Sanctum bearer token and the `administrador` role.
+</Warning>
+
+## List users
+
+```bash
+GET /api/v1/admin/usuarios
+```
+
+Returns all users ordered by `nombre`, each with their roles and activity counts (`entradas`, `adjuntos`, `importaciones`, `configuracion`).
+
+### Example
+
+```bash
+curl https://example.com/api/v1/admin/usuarios \
+  -H "Authorization: Bearer {token}"
+```
+
+---
+
+## Create user
+
+```bash
+POST /api/v1/admin/usuarios
+```
+
+<ParamField body="nombre" type="string" required>
+  Full name. Maximum 200 characters.
+</ParamField>
+
+<ParamField body="correo" type="string" required>
+  Email address. Must be unique. Maximum 200 characters.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Initial password. Minimum 8 characters.
+</ParamField>
+
+<ParamField body="estatus_actual" type="string" required>
+  Employment status. Allowed values: `Temporal`, `Base`.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Whether the account is active. Defaults to `true`.
+</ParamField>
+
+<ParamField body="rpe" type="string">
+  RPE identifier. Maximum 5 characters. Must be unique when provided.
+</ParamField>
+
+<ParamField body="rtt" type="string">
+  RTT identifier. Maximum 5 characters. Must be unique when provided.
+</ParamField>
+
+<ParamField body="roles" type="array">
+  List of role names to assign. Available roles are returned by `GET /api/v1/admin/roles`.
+  <Expandable title="roles item">
+    Each element is a role name string (for example, `"operador"`, `"administrador"`, `"invitado"`).
+  </Expandable>
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/usuarios \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Carlos Mendoza",
+    "correo": "cmendoza@example.com",
+    "password": "securepass1",
+    "estatus_actual": "Base",
+    "activo": true,
+    "rpe": "C0042",
+    "roles": ["operador"]
+  }'
+```
+
+### Response
+
+Returns the created `UserResource` object with roles loaded.
+
+---
+
+## Update user
+
+```bash
+PUT /api/v1/admin/usuarios/{user}
+```
+
+All fields are optional (`sometimes`).
+
+<ParamField body="nombre" type="string">
+  Updated full name. Maximum 200 characters.
+</ParamField>
+
+<ParamField body="correo" type="string">
+  Updated email address. Must be unique (ignoring the current user's own record).
+</ParamField>
+
+<ParamField body="password" type="string">
+  New password. Minimum 8 characters. When blank or absent, the password is not changed.
+</ParamField>
+
+<ParamField body="estatus_actual" type="string">
+  Updated employment status. Allowed values: `Temporal`, `Base`.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Updated active flag.
+</ParamField>
+
+<ParamField body="rpe" type="string">
+  Updated RPE. Must be unique (ignoring the current record).
+</ParamField>
+
+<ParamField body="rtt" type="string">
+  Updated RTT. Must be unique (ignoring the current record).
+</ParamField>
+
+<ParamField body="roles" type="array">
+  Full replacement list of role names. When included, all existing roles are replaced.
+</ParamField>
+
+<Warning>
+  You cannot remove the `administrador` role or deactivate a user if they are the last active administrator. The endpoint returns `422` with the message `"Debe existir al menos un administrador activo."`
+</Warning>
+
+---
+
+## Delete user
+
+```bash
+DELETE /api/v1/admin/usuarios/{user}
+```
+
+Returns `204 No Content` on success.
+
+**Deletion is prevented if:**
+- The user is the last active administrator (`422`).
+- The user has associated entries, attachments, imports, or configuration records (`422` with message `"No se puede eliminar porque tiene historial."`).
+
+---
+
+## List roles
+
+```bash
+GET /api/v1/admin/roles
+```
+
+Returns all available roles. Use the `name` field when assigning roles via the `roles` array in create or update requests.
+
+### Response
+
+```json
+[
+  { "id": 1, "name": "administrador", "guard_name": "web" },
+  { "id": 2, "name": "operador",      "guard_name": "web" },
+  { "id": 3, "name": "invitado",      "guard_name": "web" }
+]
+```
+
+---
+
+## User object
+
+<ResponseField name="id" type="integer">Unique user ID.</ResponseField>
+<ResponseField name="nombre" type="string">Full name.</ResponseField>
+<ResponseField name="correo" type="string">Email address.</ResponseField>
+<ResponseField name="activo" type="boolean">Whether the account is active.</ResponseField>
+<ResponseField name="estatus_actual" type="string">`Temporal` or `Base`.</ResponseField>
+<ResponseField name="rpe" type="string">RPE identifier (nullable).</ResponseField>
+<ResponseField name="rtt" type="string">RTT identifier (nullable).</ResponseField>
+<ResponseField name="ultimo_acceso" type="string">Last login timestamp (nullable).</ResponseField>
+<ResponseField name="roles" type="array">List of assigned role names (when loaded).</ResponseField>
+<ResponseField name="has_historial" type="boolean">Whether the user has any associated records.</ResponseField>
+<ResponseField name="historial_counts" type="object">
+  <Expandable title="historial_counts fields">
+    <ResponseField name="entradas" type="integer">Number of log entries authored.</ResponseField>
+    <ResponseField name="adjuntos" type="integer">Number of attachments uploaded.</ResponseField>
+    <ResponseField name="importaciones" type="integer">Number of inventory imports executed.</ResponseField>
+    <ResponseField name="configuracion" type="integer">Number of user configuration settings.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="created_at" type="string">Account creation timestamp.</ResponseField>
+<ResponseField name="updated_at" type="string">Last update timestamp.</ResponseField>
+
+## Role object
+
+<ResponseField name="id" type="integer">Unique role ID.</ResponseField>
+<ResponseField name="name" type="string">Role name.</ResponseField>
+<ResponseField name="guard_name" type="string">Guard the role belongs to.</ResponseField>

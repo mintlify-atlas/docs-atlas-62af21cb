@@ -1,0 +1,90 @@
+---
+title: "Authentication"
+description: "How to authenticate with the Bitácora Operativa API using Laravel Sanctum's SPA session cookie flow."
+---
+
+Bitácora Operativa uses [Laravel Sanctum](https://laravel.com/docs/sanctum) with a **cookie-based SPA authentication** flow. There are no API tokens. Instead, you obtain an authenticated session by performing a CSRF handshake and then logging in with your credentials. All subsequent requests use the session cookie automatically.
+
+## Authentication flow
+
+<Steps>
+  <Step title="Fetch the CSRF cookie">
+    Make a `GET` request to `/sanctum/csrf-cookie`. Laravel responds with an `XSRF-TOKEN` cookie. You must include this on every mutating request.
+
+    ```bash
+    curl -c cookies.txt \
+      -X GET https://your-app.example.com/sanctum/csrf-cookie
+    ```
+  </Step>
+
+  <Step title="Log in">
+    `POST` your credentials to `/login`. Extract the value of the `XSRF-TOKEN` cookie and pass it in the `X-XSRF-TOKEN` header.
+
+    ```bash
+    XSRF=$(grep 'XSRF-TOKEN' cookies.txt | awk '{print $7}' | python3 -c "import sys, urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))")
+
+    curl -b cookies.txt -c cookies.txt \
+      -X POST https://your-app.example.com/login \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -H "X-XSRF-TOKEN: $XSRF" \
+      -d '{"email": "operator@example.com", "password": "secret"}'
+    ```
+
+    A successful login returns `HTTP 204 No Content`. The session cookie is stored in `cookies.txt`.
+  </Step>
+
+  <Step title="Make authenticated requests">
+    Include the session cookie and the `X-XSRF-TOKEN` header on every subsequent request.
+
+    ```bash
+    curl -b cookies.txt \
+      -H "Accept: application/json" \
+      -H "X-XSRF-TOKEN: $XSRF" \
+      https://your-app.example.com/api/v1/me
+    ```
+  </Step>
+
+  <Step title="Log out">
+    Invalidate the session by posting to `/logout`.
+
+    ```bash
+    curl -b cookies.txt -c cookies.txt \
+      -X POST https://your-app.example.com/logout \
+      -H "Accept: application/json" \
+      -H "X-XSRF-TOKEN: $XSRF"
+    ```
+
+    Returns `HTTP 204 No Content`.
+  </Step>
+</Steps>
+
+## CSRF protection
+
+All `POST`, `PUT`, `PATCH`, and `DELETE` requests require the `X-XSRF-TOKEN` header. The value is the URL-decoded contents of the `XSRF-TOKEN` cookie that Laravel sets during the CSRF cookie request.
+
+<Warning>
+  If you omit the `X-XSRF-TOKEN` header on mutating requests, Laravel returns `HTTP 419 Page Expired`.
+</Warning>
+
+## Access tiers
+
+Endpoints are grouped into three access tiers:
+
+| Tier | Middleware | Description |
+|---|---|---|
+| **Public** | None | No authentication required. |
+| **Operator** | `auth:sanctum` + `role:operador\|administrador` | Requires an active session with the `operador` or `administrador` role. |
+| **Administrator** | `auth:sanctum` + `role:administrador` | Requires an active session with the `administrador` role. |
+
+<Note>
+  The public entry and catalog endpoints may still require authentication if the `bitacora_publica` system configuration flag is set to `false`. In that case, unauthenticated requests to `GET /api/v1/entradas` and `GET /api/v1/entradas/{entrada}` return `HTTP 401`.
+</Note>
+
+## Error responses
+
+| Status | Meaning |
+|---|---|
+| `401 Unauthorized` | No valid session. You need to log in. |
+| `403 Forbidden` | You are authenticated but your role does not permit the action. |
+| `419 Page Expired` | CSRF token missing or invalid. |

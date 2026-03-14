@@ -1,0 +1,425 @@
+---
+title: "Admin: inventory management"
+description: "Manage networks, domains, inventory elements, import rules, and bulk CSV imports. Requires the administrador role."
+---
+
+<Warning>
+All endpoints in this section require authentication via a Sanctum bearer token and the `administrador` role.
+</Warning>
+
+## Networks
+
+### List networks
+
+```bash
+GET /api/v1/admin/inventario/redes
+```
+
+Returns all networks with `elementos_count` and `importaciones_count`.
+
+### Create network
+
+```bash
+POST /api/v1/admin/inventario/redes
+```
+
+<ParamField body="codigo" type="string" required>
+  Unique short code. Maximum 40 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Display name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Active flag. Defaults to `true`.
+</ParamField>
+
+<ParamField body="dominio_ids" type="array">
+  IDs of domains to associate with this network.
+  <Expandable title="dominio_ids item">
+    Each element is an integer ID from the `inv_dominios` table.
+  </Expandable>
+</ParamField>
+
+### Update network
+
+```bash
+PUT /api/v1/admin/inventario/redes/{red}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete network
+
+```bash
+DELETE /api/v1/admin/inventario/redes/{red}
+```
+
+Returns `204 No Content`.
+
+---
+
+## Domains
+
+### List domains
+
+```bash
+GET /api/v1/admin/inventario/dominios
+```
+
+### Create domain
+
+```bash
+POST /api/v1/admin/inventario/dominios
+```
+
+<ParamField body="codigo" type="string" required>
+  Unique short code. Maximum 40 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Display name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="orden" type="integer">
+  Display sort order.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Active flag. Defaults to `true`.
+</ParamField>
+
+### Update domain
+
+```bash
+PUT /api/v1/admin/inventario/dominios/{dominio}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete domain
+
+```bash
+DELETE /api/v1/admin/inventario/dominios/{dominio}
+```
+
+Returns `204 No Content`.
+
+---
+
+## Inventory elements
+
+Elements are the individual network entities (nodes, links, services, tunnels, trails) that log entries reference.
+
+### List elements
+
+```bash
+GET /api/v1/admin/inventario/elementos
+```
+
+### Create element
+
+```bash
+POST /api/v1/admin/inventario/elementos
+```
+
+<ParamField body="red_id" type="integer" required>
+  ID of the parent network.
+</ParamField>
+
+<ParamField body="tipo" type="string" required>
+  Element type. Allowed values: `nodo`, `enlace`, `servicio`, `tunel`, `trail`.
+</ParamField>
+
+<ParamField body="codigo" type="string" required>
+  Unique code within the same `(red_id, tipo)` combination. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string">
+  Optional display name. Maximum 200 characters.
+</ParamField>
+
+<ParamField body="estado" type="string">
+  Lifecycle state. Allowed values: `activo`, `baja`, `planificado`, `desconocido`.
+</ParamField>
+
+<ParamField body="fecha_alta" type="string">
+  Date the element became operational (ISO 8601 date).
+</ParamField>
+
+<ParamField body="fecha_baja" type="string">
+  Date the element was decommissioned (ISO 8601 date).
+</ParamField>
+
+<ParamField body="updated_at_fuente" type="string">
+  Last-updated timestamp from the source system.
+</ParamField>
+
+<ParamField body="observaciones" type="string">
+  Free-text observations. Maximum 255 characters.
+</ParamField>
+
+<Note>
+  The `origen` field is **prohibited** in the request body. Manually created elements receive `origen = manual` automatically.
+</Note>
+
+### Update element
+
+```bash
+PUT /api/v1/admin/inventario/elementos/{elemento}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete element
+
+```bash
+DELETE /api/v1/admin/inventario/elementos/{elemento}
+```
+
+Returns `204 No Content`.
+
+---
+
+## Import rules
+
+Import rules define how CSV files from NMS/EMS systems are parsed and mapped to inventory elements.
+
+### List import rules
+
+```bash
+GET /api/v1/admin/inventario/import-reglas
+```
+
+Supports optional `red_id` query parameter to filter by network.
+
+### Create import rule
+
+```bash
+POST /api/v1/admin/inventario/import-reglas
+```
+
+<ParamField body="red_id" type="integer" required>
+  ID of the network this rule belongs to.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Unique name within the network. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="tipo_elemento" type="string" required>
+  Target element type. Allowed values: `nodo`, `enlace`, `servicio`, `tunel`.
+</ParamField>
+
+<ParamField body="delimitador" type="string" required>
+  CSV column delimiter. Must be exactly 1 character (for example, `,` or `;`).
+</ParamField>
+
+<ParamField body="archivo_patron" type="string">
+  Optional filename pattern used to auto-match uploaded files. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="usa_comillas" type="boolean">
+  Whether fields may be quoted. Defaults to `false`.
+</ParamField>
+
+<ParamField body="tiene_encabezado" type="boolean">
+  Whether the first row is a header row. When `false`, `columna_fuente` must use numeric column indices.
+</ParamField>
+
+<ParamField body="encoding" type="string">
+  Source file encoding (for example, `UTF-8`, `ISO-8859-1`). Maximum 40 characters.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Active flag.
+</ParamField>
+
+<ParamField body="campos" type="array">
+  Column mapping definitions.
+  <Expandable title="campos item fields">
+    <ParamField body="columna_fuente" type="string">
+      Source column name (when `tiene_encabezado = true`) or numeric index (when `false`).
+    </ParamField>
+    <ParamField body="campo_destino" type="string" required>
+      Destination field in `inv_elementos_redes`. Allowed values depend on `tipo_elemento` — all types share `codigo`, `nombre`, `observaciones`; type-specific fields are documented in the source model. The server normalises common aliases (for example, `code` → `codigo`, `name` → `nombre`).
+    </ParamField>
+    <ParamField body="transformacion" type="string">
+      Optional transformation to apply. Maximum 80 characters.
+    </ParamField>
+    <ParamField body="por_defecto" type="string">
+      Default value when `columna_fuente` is empty or absent.
+    </ParamField>
+    <ParamField body="es_clave_upsert" type="boolean">
+      Whether this field is part of the upsert key. Defaults to `false`.
+    </ParamField>
+    <ParamField body="orden" type="integer">
+      Processing order (0–65535).
+    </ParamField>
+    <ParamField body="activo" type="boolean">
+      Whether this mapping is active.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Warning>
+  At least one campo must map `campo_destino` to `codigo` (or an accepted alias). Rules without a `codigo` mapping are rejected with `422`.
+</Warning>
+
+### Update import rule
+
+```bash
+PUT /api/v1/admin/inventario/import-reglas/{regla}
+```
+
+When `campos` is included, the existing campo set is replaced entirely. Omit `campos` to leave it unchanged.
+
+### Delete import rule
+
+```bash
+DELETE /api/v1/admin/inventario/import-reglas/{regla}
+```
+
+Returns `422` if the rule has any associated imports.
+
+---
+
+## Import executions
+
+### List imports
+
+```bash
+GET /api/v1/admin/inventario/importaciones
+```
+
+Returns the latest 100 imports ordered by creation date descending. Each item includes computed `es_revertible`, `reversion_status`, and `reversion_candidatos` fields. Supports optional `red_id` query parameter.
+
+### List import errors
+
+```bash
+GET /api/v1/admin/inventario/importaciones/{importacion}/errores
+```
+
+<ParamField query="limit" type="integer" default="200">
+  Maximum number of error rows to return. Clamped to 1–1000.
+</ParamField>
+
+Returns:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "fila_numero": 42,
+      "campo": "codigo",
+      "valor": "NODE_X",
+      "mensaje": "Duplicate key",
+      "created_at": "2026-03-14T10:00:00.000000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Execute import
+
+```bash
+POST /api/v1/admin/inventario/importaciones/ejecutar
+```
+
+Content-Type: `multipart/form-data`
+
+<ParamField body="red_id" type="integer" required>
+  ID of the network to import into.
+</ParamField>
+
+<ParamField body="regla_id" type="integer" required>
+  ID of the import rule to apply. Must belong to `red_id`.
+</ParamField>
+
+<ParamField body="archivo" type="file" required>
+  The CSV file to import. Maximum 50 MB.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/inventario/importaciones/ejecutar \
+  -H "Authorization: Bearer {token}" \
+  -F "red_id=1" \
+  -F "regla_id=3" \
+  -F "archivo=@/path/to/nodes.csv"
+```
+
+### Revert import
+
+```bash
+POST /api/v1/admin/inventario/importaciones/{importacion}/revertir
+```
+
+Deletes elements created by the specified import, subject to safety checks:
+- The import must be in `completado` state.
+- It must be the most recent revertible import for that network and element type.
+- No in-progress import may exist for the same network and type.
+- None of the elements to delete may be linked to log entries.
+
+Returns:
+
+```json
+{
+  "message": "Reversión completada.",
+  "eliminados": 150,
+  "red_id": 1,
+  "tipo_elemento": "nodo"
+}
+```
+
+---
+
+## Data purge
+
+```bash
+POST /api/v1/admin/depuracion/purgar-no-usados
+```
+
+Permanently removes unused inventory elements, equipment, and technical locations. See [Admin: maintenance](/api/admin-maintenance) for the full reference.
+
+<Warning>
+  This operation is irreversible. Use `dry_run` mode or review `reversion_candidatos` counts before executing destructive operations.
+</Warning>
+
+---
+
+## Import execution object
+
+<ResponseField name="id" type="integer">Import record ID.</ResponseField>
+<ResponseField name="red_id" type="integer">Network ID.</ResponseField>
+<ResponseField name="red" type="object">Network summary (when loaded).</ResponseField>
+<ResponseField name="regla_id" type="integer">Import rule ID.</ResponseField>
+<ResponseField name="regla" type="object">Rule summary (when loaded).</ResponseField>
+<ResponseField name="usuario_id" type="integer">User who ran the import.</ResponseField>
+<ResponseField name="archivo_nombre" type="string">Original filename.</ResponseField>
+<ResponseField name="fuente" type="string">Storage path of the uploaded file.</ResponseField>
+<ResponseField name="hash_archivo" type="string">SHA-256 hash of the uploaded file.</ResponseField>
+<ResponseField name="estado" type="string">`procesando`, `completado`, or `fallido`.</ResponseField>
+<ResponseField name="total_registros" type="integer">Total rows in the file.</ResponseField>
+<ResponseField name="procesados" type="integer">Rows processed.</ResponseField>
+<ResponseField name="creados" type="integer">New elements created.</ResponseField>
+<ResponseField name="actualizados" type="integer">Existing elements updated.</ResponseField>
+<ResponseField name="marcados_baja" type="integer">Elements marked as decommissioned.</ResponseField>
+<ResponseField name="errores_count" type="integer">Number of error rows.</ResponseField>
+<ResponseField name="es_revertible" type="boolean">Whether this import can currently be reverted.</ResponseField>
+<ResponseField name="reversion_status" type="string">`revertible`, `sin_nuevos`, `revertida`, or `no_disponible`.</ResponseField>
+<ResponseField name="reversion_candidatos" type="integer">Number of elements eligible for reversion.</ResponseField>
+<ResponseField name="created_at" type="string">Import start timestamp.</ResponseField>
+<ResponseField name="updated_at" type="string">Import completion timestamp.</ResponseField>

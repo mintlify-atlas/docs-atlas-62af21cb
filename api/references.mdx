@@ -1,0 +1,88 @@
+---
+title: "External references (operator)"
+description: "Link log entries to external system folios. Requires the operador or administrador role."
+---
+
+<Note>
+All endpoints in this section require authentication via a Sanctum bearer token and the `operador` or `administrador` role.
+</Note>
+
+## Create external reference
+
+```bash
+POST /api/v1/referencias
+```
+
+Creates an external reference that links a log entry to a folio or ticket ID in an external system. After creation, the entry's `resumen_tecnico` field is automatically regenerated.
+
+<Note>
+  You must have permission to update the target entry. Administrators can reference any entry; operators can only reference their own entries.
+</Note>
+
+### Request body
+
+<ParamField body="entrada_id" type="integer" required>
+  ID of the log entry to link. Must exist in `entradas_bitacora`.
+</ParamField>
+
+<ParamField body="sistema_externo_id" type="integer" required>
+  ID of an active external system (`activo = 1`) from the `sistemas_externos` catalog.
+</ParamField>
+
+<ParamField body="externo_id" type="string" required>
+  The identifier or folio number in the external system. Maximum 120 characters.
+
+  If the external system has a `patron_regex` configured, this value is validated against that pattern. A mismatch returns `422` with the message `"El identificador no cumple el patrón"`.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/referencias \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entrada_id": 101,
+    "sistema_externo_id": 2,
+    "externo_id": "INC-20260314-0042"
+  }'
+```
+
+### Response
+
+Returns a `ReferenciaExternaResource` object.
+
+```json
+{
+  "id": 15,
+  "entrada_id": 101,
+  "sistema_externo_id": 2,
+  "externo_id": "INC-20260314-0042",
+  "sistema": {
+    "id": 2,
+    "codigo": "REMEDY",
+    "nombre": "Remedy ITSM"
+  }
+}
+```
+
+---
+
+## External reference object
+
+<ResponseField name="id" type="integer">Unique reference ID.</ResponseField>
+<ResponseField name="entrada_id" type="integer">ID of the linked log entry.</ResponseField>
+<ResponseField name="sistema_externo_id" type="integer">ID of the external system.</ResponseField>
+<ResponseField name="externo_id" type="string">The folio or ticket identifier in the external system.</ResponseField>
+<ResponseField name="sistema" type="object">
+  External system summary (included when the relation is loaded).
+  <Expandable title="sistema fields">
+    <ResponseField name="id" type="integer">System ID.</ResponseField>
+    <ResponseField name="codigo" type="string">Short system code.</ResponseField>
+    <ResponseField name="nombre" type="string">Human-readable system name.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<Info>
+  To delete an external reference, include its ID in the `referencias_eliminar` array when updating the parent entry via `PUT /api/v1/entradas/{entrada}`.
+</Info>

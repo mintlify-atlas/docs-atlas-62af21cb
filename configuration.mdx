@@ -1,0 +1,126 @@
+---
+title: "Configuration"
+description: "All environment variables for Bitácora Operativa, grouped by purpose, with default values and notes on production requirements."
+---
+
+All configuration is done through the `.env` file at the project root. Copy `.env.example` as your starting point:
+
+```bash
+cp .env.example .env
+```
+
+## App settings
+
+| Variable | Default | Description |
+|---|---|---|
+| `APP_NAME` | `Laravel` | Application name displayed in emails and logs |
+| `APP_ENV` | `local` | Environment name. Use `production` in production |
+| `APP_KEY` | _(empty)_ | Encryption key. Generate with `php artisan key:generate` |
+| `APP_DEBUG` | `true` | Show detailed error pages. Set to `false` in production |
+| `APP_URL` | `http://localhost` | Full application URL used for link generation |
+
+<Warning>
+  In production, always set `APP_ENV=production`, `APP_DEBUG=false`, and `APP_URL` to your real HTTPS domain. Leaving `APP_DEBUG=true` on a public server exposes stack traces and internal configuration.
+</Warning>
+
+## Database
+
+| Variable | Default | Description |
+|---|---|---|
+| `DB_CONNECTION` | `mysql` | Database driver. Must remain `mysql` |
+| `DB_HOST` | `127.0.0.1` | MySQL host |
+| `DB_PORT` | `3306` | MySQL port |
+| `DB_DATABASE` | `laravel` | Database name |
+| `DB_USERNAME` | `root` | Database user |
+| `DB_PASSWORD` | _(empty)_ | Database password |
+
+When using the included `compose.yml`, the matching values are:
+
+```env
+DB_DATABASE=bitacora
+DB_USERNAME=bitacora
+DB_PASSWORD=bitacora
+```
+
+## Session and cache
+
+| Variable | Default | Description |
+|---|---|---|
+| `SESSION_DRIVER` | `file` | Session storage backend (`file`, `database`, `redis`, `cookie`) |
+| `SESSION_LIFETIME` | `120` | Session lifetime in minutes |
+| `CACHE_DRIVER` | `file` | Cache backend (`file`, `redis`, `memcached`, `array`) |
+| `QUEUE_CONNECTION` | `sync` | Queue driver. `sync` means jobs run inline (no worker needed) |
+| `BROADCAST_DRIVER` | `log` | Broadcast driver. Real-time broadcasting is not active |
+| `FILESYSTEM_DISK` | `local` | Default filesystem disk for file storage |
+
+## Logging
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_CHANNEL` | `stack` | Log channel configuration (see `config/logging.php`) |
+| `LOG_LEVEL` | `debug` | Minimum log level (`debug`, `info`, `warning`, `error`) |
+
+## Mail
+
+| Variable | Default | Description |
+|---|---|---|
+| `MAIL_MAILER` | `smtp` | Mail transport driver |
+| `MAIL_HOST` | `mailpit` | SMTP host |
+| `MAIL_PORT` | `1025` | SMTP port |
+| `MAIL_USERNAME` | `null` | SMTP username |
+| `MAIL_PASSWORD` | `null` | SMTP password |
+| `MAIL_ENCRYPTION` | `null` | SMTP encryption (`tls`, `ssl`, or `null`) |
+| `MAIL_FROM_ADDRESS` | `hello@example.com` | Default sender address |
+| `MAIL_FROM_NAME` | `${APP_NAME}` | Default sender name |
+
+<Note>
+  Mail sending is not actively used in this version of the application. These variables are included as part of the Laravel base configuration.
+</Note>
+
+## Rate limiting
+
+Rate limiting is configurable per environment. The defaults are intentionally relaxed for local development and strict for production.
+
+<Warning>
+  You **must** enable both rate limiters in production. After changing any rate-limiting variable, run `php artisan optimize:clear` to apply the new values.
+</Warning>
+
+### API rate limiter
+
+| Variable | Dev default | Prod default | Description |
+|---|---|---|---|
+| `RATE_LIMIT_API_ENABLED` | `false` | `true` | Enable the API rate limiter |
+| `RATE_LIMIT_API_MAX_ATTEMPTS` | `6000` | `60` | Maximum requests per window |
+| `RATE_LIMIT_API_DECAY_MINUTES` | `1` | `1` | Window size in minutes |
+
+### Login rate limiter
+
+| Variable | Dev default | Prod default | Description |
+|---|---|---|---|
+| `RATE_LIMIT_LOGIN_ENABLED` | `false` | `true` | Enable the login rate limiter |
+| `RATE_LIMIT_LOGIN_MAX_ATTEMPTS` | `50` | `5` | Maximum login attempts per window |
+| `RATE_LIMIT_LOGIN_DECAY_SECONDS` | `60` | `60` | Window size in seconds |
+
+When a rate limit is exceeded, the API responds with HTTP `429 Too Many Requests`.
+
+After changing rate-limiting variables:
+
+```bash
+php artisan optimize:clear
+```
+
+## Storage paths
+
+| Path | Contents |
+|---|---|
+| `storage/app/public/adjuntos/*` | Uploaded images and files attached to log entries. Images are normalized to PNG |
+| `storage/app/imports/*` | Source CSV files for network inventory imports |
+
+Both paths are managed automatically by the application. Use the cleanup commands or the **Mantenimiento** UI to remove stale files.
+
+## Frontend (Vite)
+
+| Variable | Description |
+|---|---|
+| `VITE_APP_NAME` | Exposes `APP_NAME` to the Vue application |
+| `VITE_PUSHER_*` | Pusher/broadcasting config forwarded to the frontend (not actively used) |

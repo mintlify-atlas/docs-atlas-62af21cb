@@ -1,0 +1,260 @@
+---
+title: "Catalogs (public)"
+description: "Read-only catalog endpoints for entry criteria, impact levels, and PM work order/activity classes."
+---
+
+These endpoints return the active catalog values used when classifying log entries. No authentication is required.
+
+---
+
+## Entry criteria
+
+`GET /api/v1/catalogos/criterios`
+
+Returns all active entry criterion records, ordered by `orden`.
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="CatEntradaCriterio">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="codigo" type="string">Short code (e.g. `INT`).</ResponseField>
+    <ResponseField name="nombre" type="string">Display name.</ResponseField>
+    <ResponseField name="descripcion" type="string | null">Optional description.</ResponseField>
+    <ResponseField name="orden" type="integer">Sort order.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the criterion is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/catalogos/criterios" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "codigo": "MAN",
+      "nombre": "Mantenimiento programado",
+      "descripcion": "Trabajos de mantenimiento preventivo calendarizados.",
+      "orden": 1,
+      "activo": true
+    },
+    {
+      "id": 2,
+      "codigo": "INT",
+      "nombre": "Interrupción de servicio",
+      "descripcion": null,
+      "orden": 2,
+      "activo": true
+    }
+  ]
+}
+```
+
+---
+
+## Impact levels
+
+`GET /api/v1/catalogos/impactos`
+
+Returns all active impact level records, ordered by `orden`.
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="CatEntradaImpacto">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="codigo" type="string">Short code (e.g. `ALT`).</ResponseField>
+    <ResponseField name="nombre" type="string">Display name.</ResponseField>
+    <ResponseField name="descripcion" type="string | null">Optional description.</ResponseField>
+    <ResponseField name="severidad" type="integer">Numeric severity (higher = more severe).</ResponseField>
+    <ResponseField name="orden" type="integer">Sort order.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the impact level is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/catalogos/impactos" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "codigo": "BAJ",
+      "nombre": "Bajo",
+      "descripcion": "Impacto mínimo en el servicio.",
+      "severidad": 1,
+      "orden": 1,
+      "activo": true
+    },
+    {
+      "id": 3,
+      "codigo": "ALT",
+      "nombre": "Alto",
+      "descripcion": null,
+      "severidad": 3,
+      "orden": 3,
+      "activo": true
+    }
+  ]
+}
+```
+
+---
+
+## PM work order classes
+
+`GET /api/v1/catalogos/pm/ordenes`
+
+Returns all active PM work order classes (clases de orden), ordered alphabetically by `nombre`.
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="PmClaseOrden">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="nombre" type="string">Work order class name.</ResponseField>
+    <ResponseField name="descripcion" type="string | null">Optional description.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the class is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/catalogos/pm/ordenes" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "nombre": "Correctivo",
+      "descripcion": "Orden de trabajo correctivo.",
+      "activo": true
+    },
+    {
+      "id": 2,
+      "nombre": "Preventivo",
+      "descripcion": null,
+      "activo": true
+    }
+  ]
+}
+```
+
+---
+
+## PM activity classes
+
+`GET /api/v1/catalogos/pm/actividades`
+
+Returns all active PM activity classes, ordered alphabetically by `nombre`.
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="PmClaseActividad">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="nombre" type="string">Activity class name.</ResponseField>
+    <ResponseField name="descripcion" type="string | null">Optional description.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the class is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/catalogos/pm/actividades" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "nombre": "Inspección visual",
+      "descripcion": null,
+      "activo": true
+    },
+    {
+      "id": 2,
+      "nombre": "Sustitución de componente",
+      "descripcion": "Reemplazo físico de hardware.",
+      "activo": true
+    }
+  ]
+}
+```
+
+---
+
+## PM order-activity matrix
+
+`GET /api/v1/catalogos/pm/matriz`
+
+Returns the valid combinations of PM work order classes and activity classes. When creating an entry you must use a combination present in this matrix.
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="PmMatrizOrdenActividad">
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="pm_clase_orden_id" type="integer">ID of the work order class.</ResponseField>
+    <ResponseField name="pm_clase_actividad_id" type="integer">ID of the activity class.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the combination is active.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<Note>
+  Cross-reference `pm_clase_orden_id` and `pm_clase_actividad_id` with the `/pm/ordenes` and `/pm/actividades` endpoints to get the human-readable names.
+</Note>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/catalogos/pm/matriz" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "pm_clase_orden_id": 1,
+      "pm_clase_actividad_id": 2,
+      "activo": true
+    },
+    {
+      "id": 2,
+      "pm_clase_orden_id": 2,
+      "pm_clase_actividad_id": 1,
+      "activo": true
+    }
+  ]
+}
+```

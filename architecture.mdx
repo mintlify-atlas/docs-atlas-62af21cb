@@ -1,0 +1,152 @@
+---
+title: "Architecture"
+description: "How Bitácora Operativa is structured: Laravel backend, Vue 3 SPA, MySQL 8, Sanctum authentication, and role-based access control."
+---
+
+## Overview
+
+Bitácora Operativa is a full-stack SaaS built on **Laravel 10** (backend API), **Vue 3 + Vite** (single-page application), and **MySQL 8** (relational database). Laravel and Vue share the same origin — Laravel serves the SPA shell and exposes a versioned REST API that Vue consumes.
+
+```
+Browser
+  │
+  ├── GET /             → Laravel web route → spa.blade.php (SPA shell)
+  ├── GET /dashboard    → Laravel web route (auth middleware) → spa.blade.php
+  ├── GET /{any}        → Laravel fallback route → spa.blade.php
+  │                       (excludes /api, /sanctum, /storage)
+  │
+  └── GET|POST /api/v1/... → Laravel API routes (JSON)
+```
+
+Once the browser loads `spa.blade.php`, **Vue Router** takes over all in-app navigation using `createWebHistory()` — no full-page reloads occur after the initial load.
+
+<Info>
+  The SPA routes and API routes share the same domain and port. There is no separate frontend server in production.
+</Info>
+
+## Laravel web routes
+
+Defined in `routes/web.php`:
+
+| Route | Middleware | Description |
+|---|---|---|
+| `GET /` | — | Renders `spa.blade.php` |
+| `GET /dashboard` | `auth` | Requires an active backend session |
+| `GET /{any}` | — | SPA fallback for all other paths (excludes `api`, `sanctum`, `storage`) |
+
+Auth routes (`GET /login`, `POST /login`, `POST /logout`, password management) are defined in `routes/auth.php` via Laravel Breeze.
+
+## API structure
+
+All API endpoints are versioned under `/api/v1/`. The API is split into three tiers:
+
+### Public tier (no authentication required)
+
+- `GET /api/v1/entradas` — list published log entries
+- `GET /api/v1/entradas/{id}` — single entry detail
+- `GET /api/v1/catalogos/criterios|impactos|pm/*` — active operational catalogs
+- `GET /api/v1/sistemas-externos` — active external systems
+- `GET /api/v1/configuracion/sistema` — public system configuration
+- `GET /api/v1/ubicaciones`, `/ubicaciones/detalle-niveles`, `/equipos` — technical locations and equipment
+- `GET /api/v1/inventario/elementos` — active network inventory elements
+
+### Operator tier (`auth:sanctum`, role `operador|administrador`)
+
+- Dashboard summary, entry management (CRUD, publish/unpublish)
+- Attachments (images and files), external references
+- User configuration and password change
+
+### Administrator tier (`auth:sanctum`, role `administrador`, prefix `/api/v1/admin`)
+
+- Operational catalog CRUD (criteria, impacts)
+- PM matrix CRUD (work order classes, activity classes, matrix)
+- External systems CRUD
+- Inventory CRUD (networks, domains, elements, import rules)
+- Technical locations and equipment CRUD, SAP-like ZPM017 import
+- User and role management
+- System configuration management
+- Maintenance endpoints (attachment cleanup, import file cleanup, data purge)
+
+<Note>
+  Run `php artisan route:list` to see the full, up-to-date route inventory in your installed copy.
+</Note>
+
+## Authentication flow
+
+Authentication uses **Laravel Sanctum** in stateful (session cookie + CSRF) mode — there are no API tokens.
+
+```
+1. Vue calls GET /sanctum/csrf-cookie
+   → Laravel sets XSRF-TOKEN cookie
+
+2. Vue submits POST /login with credentials + XSRF-TOKEN header
+   → Laravel validates, creates session, returns session cookie
+
+3. All subsequent API calls include the session cookie
+   → Sanctum middleware validates session via auth:sanctum
+
+4. POST /logout invalidates the session
+```
+
+## Vue Router and SPA navigation
+
+Vue Router is configured with `createWebHistory()`, so all routes are real URL paths (no hash). The router guard in `resources/js/router.js` enforces three access patterns:
+
+| Meta flag | Behavior |
+|---|---|
+| `publicBitacoraGate: true` | Checks `bitacora_publica` system config; redirects to login if the logbook is private and no session exists |
+| `guest: true` | Redirects authenticated users to `/dashboard` |
+| `requiresAuth: true` | Redirects unauthenticated users to `/login`; checks `roles` array if present |
+
+### SPA routes and required roles
+
+| Path | Roles |
+|---|---|
+| `/timeline` | Public (gate controlled) |
+| `/entradas/:id` | Public (gate controlled) |
+| `/login` | Guest only |
+| `/dashboard` | Any authenticated user |
+| `/entradas/nueva` | `operador`, `administrador` |
+| `/entradas/gestion` | `operador`, `administrador` |
+| `/entradas/:id/editar` | `operador`, `administrador` |
+| `/configuracion` | `operador`, `administrador` |
+| `/pm-matriz` | `administrador` |
+| `/catalogos-tecnicos` | `administrador` |
+| `/sistemas-externos` | `administrador` |
+| `/inventario-redes` | `administrador` |
+| `/importaciones-reglas` | `administrador` |
+| `/ubicaciones-equipos` | `administrador` |
+| `/usuarios-roles` | `administrador` |
+
+## Role hierarchy
+
+Roles are managed by **Spatie Laravel Permission** and enforced via the `role:*` middleware on API routes and route meta guards on the frontend.
+
+```
+public
+  └── operator (operador)
+        └── administrator (administrador)
+```
+
+- **Public** — can read published entries, catalogs, inventory, and locations if `bitacora_publica` is enabled.
+- **Operador** — all public access plus create/edit/publish entries, manage attachments and references, and view the dashboard.
+- **Administrador** — all operator access plus full catalog, inventory, location, user, and system configuration management.
+
+## Database schema
+
+The schema is defined across 12 consolidated migration files (prefix `001`–`012`):
+
+| # | Migration | Contents |
+|---|---|---|
+| 001 | `create_usuarios_table` | Users table |
+| 002 | `create_spatie_permission_tables` | Roles and permissions (Spatie) |
+| 003 | `create_configuracion_tables` | System configuration key-value store |
+| 004 | `create_dm_ubicaciones_y_equipos_tables` | Technical locations and equipment (SAP-like) |
+| 005 | `create_catalogos_operativos_tables` | Operational criteria and impact catalogs |
+| 006 | `create_pm_tables` | PM matrix: work order classes, activity classes, matrix entries |
+| 007 | `create_entradas_bitacora_tables` | Log entries (bitácora) |
+| 008 | `create_adjuntos_table` | File and image attachments |
+| 009 | `create_inventario_catalogos_tables` | Inventory catalogs (networks, domains) |
+| 010 | `create_inventario_importaciones_tables` | Import rules and execution log |
+| 011 | `create_inventario_elementos_tables` | Network inventory elements |
+| 012 | `create_sistemas_externos_tables` | External ticket/folio systems |

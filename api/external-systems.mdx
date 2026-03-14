@@ -1,0 +1,68 @@
+---
+title: "External systems (public)"
+description: "List the external systems that can be referenced from log entries."
+---
+
+External systems represent third-party ticketing, monitoring, or asset management platforms whose IDs can be linked to log entries as `referencias_externas`. No authentication is required.
+
+---
+
+## List external systems
+
+`GET /api/v1/sistemas-externos`
+
+Returns all active `SistemaExterno` records ordered by `codigo`.
+
+### Response
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="SistemaExterno" defaultOpen>
+    <ResponseField name="id" type="integer">Record ID.</ResponseField>
+    <ResponseField name="codigo" type="string">Short system code (e.g. `OTRS`, `REMEDY`).</ResponseField>
+    <ResponseField name="nombre" type="string">Full display name.</ResponseField>
+    <ResponseField name="patron_regex" type="string | null">Optional regex pattern used to validate external IDs before linking.</ResponseField>
+    <ResponseField name="activo" type="boolean">Whether the system is active.</ResponseField>
+    <ResponseField name="referencias_count" type="integer">Number of entry references currently linked to this system.</ResponseField>
+    <ResponseField name="in_use" type="boolean">`true` when `referencias_count` is greater than zero.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/sistemas-externos" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "codigo": "OTRS",
+      "nombre": "OTRS Ticket System",
+      "patron_regex": "^\\d{6,10}$",
+      "activo": true,
+      "referencias_count": 142,
+      "in_use": true
+    },
+    {
+      "id": 2,
+      "codigo": "REMEDY",
+      "nombre": "BMC Remedy",
+      "patron_regex": null,
+      "activo": true,
+      "referencias_count": 0,
+      "in_use": false
+    }
+  ]
+}
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |

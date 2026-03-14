@@ -1,0 +1,211 @@
+---
+title: "Admin: PM matrix"
+description: "Manage PM order classes, activity classes, and the order-to-activity matrix. Requires the administrador role."
+---
+
+<Warning>
+All endpoints in this section require authentication via a Sanctum bearer token and the `administrador` role.
+</Warning>
+
+The PM (preventive maintenance) system uses a two-level taxonomy:
+
+- **Order classes** (`pm_clase_orden`) represent the type of work order (for example, inspection, corrective, preventive).
+- **Activity classes** (`pm_clase_actividad`) represent specific tasks within an order.
+- The **matrix** (`pm_matriz`) defines which activity classes are valid for each order class. An entry can only reference a `(pm_clase_orden_id, pm_clase_actividad_id)` pair that exists and is active in the matrix.
+
+---
+
+## PM order classes
+
+### List order classes
+
+```bash
+GET /api/v1/admin/pm/ordenes
+```
+
+Returns all order classes with `entradas_count` and `matriz_count`.
+
+### Create order class
+
+```bash
+POST /api/v1/admin/pm/ordenes
+```
+
+<ParamField body="nombre" type="string" required>
+  Unique display name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Whether this order class is selectable in new entries. Defaults to `true`.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/pm/ordenes \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Mantenimiento preventivo",
+    "descripcion": "Trabajos periódicos programados",
+    "activo": true
+  }'
+```
+
+### Update order class
+
+```bash
+PUT /api/v1/admin/pm/ordenes/{orden}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete order class
+
+```bash
+DELETE /api/v1/admin/pm/ordenes/{orden}
+```
+
+Returns `204 No Content` on success.
+
+---
+
+## PM activity classes
+
+### List activity classes
+
+```bash
+GET /api/v1/admin/pm/actividades
+```
+
+Returns all activity classes with `entradas_count` and `matriz_count`.
+
+### Create activity class
+
+```bash
+POST /api/v1/admin/pm/actividades
+```
+
+<ParamField body="nombre" type="string" required>
+  Unique display name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Whether this activity class is selectable. Defaults to `true`.
+</ParamField>
+
+### Update activity class
+
+```bash
+PUT /api/v1/admin/pm/actividades/{actividad}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete activity class
+
+```bash
+DELETE /api/v1/admin/pm/actividades/{actividad}
+```
+
+Returns `204 No Content` on success.
+
+---
+
+## PM matrix
+
+Each matrix record authorises a specific order-activity combination.
+
+### List matrix entries
+
+```bash
+GET /api/v1/admin/pm/matriz
+```
+
+Returns all matrix records with `entradas_count`.
+
+### Create matrix entry
+
+```bash
+POST /api/v1/admin/pm/matriz
+```
+
+<ParamField body="pm_clase_orden_id" type="integer" required>
+  ID of an active PM order class.
+</ParamField>
+
+<ParamField body="pm_clase_actividad_id" type="integer" required>
+  ID of an active PM activity class.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Whether this combination is selectable in new entries. Defaults to `true`.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/pm/matriz \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pm_clase_orden_id": 1,
+    "pm_clase_actividad_id": 3,
+    "activo": true
+  }'
+```
+
+### Update matrix entry
+
+```bash
+PUT /api/v1/admin/pm/matriz/{matriz}
+```
+
+Accepts the same fields. All fields are optional.
+
+### Delete matrix entry
+
+```bash
+DELETE /api/v1/admin/pm/matriz/{matriz}
+```
+
+Returns `204 No Content` on success.
+
+---
+
+## Order class object
+
+<ResponseField name="id" type="integer">Unique order class ID.</ResponseField>
+<ResponseField name="nombre" type="string">Display name.</ResponseField>
+<ResponseField name="descripcion" type="string">Description (nullable).</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="entradas_count" type="integer">Number of entries using this order class.</ResponseField>
+<ResponseField name="matriz_count" type="integer">Number of matrix rows referencing this order class.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when entries or matrix rows reference this record.</ResponseField>
+
+## Activity class object
+
+<ResponseField name="id" type="integer">Unique activity class ID.</ResponseField>
+<ResponseField name="nombre" type="string">Display name.</ResponseField>
+<ResponseField name="descripcion" type="string">Description (nullable).</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="entradas_count" type="integer">Number of entries using this activity class.</ResponseField>
+<ResponseField name="matriz_count" type="integer">Number of matrix rows referencing this activity class.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when entries or matrix rows reference this record.</ResponseField>
+
+## Matrix entry object
+
+<ResponseField name="id" type="integer">Unique matrix record ID.</ResponseField>
+<ResponseField name="pm_clase_orden_id" type="integer">Order class ID.</ResponseField>
+<ResponseField name="pm_clase_actividad_id" type="integer">Activity class ID.</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="entradas_count" type="integer">Number of entries using this exact combination.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when at least one entry references this combination.</ResponseField>

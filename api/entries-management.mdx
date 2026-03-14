@@ -1,0 +1,447 @@
+---
+title: "Entry management (operator)"
+description: "Create, update, publish, and manage log entries. Requires the operador or administrador role."
+---
+
+<Note>
+All endpoints in this section require authentication via a Sanctum bearer token and the `operador` or `administrador` role.
+</Note>
+
+## List entries for management
+
+<Warning>
+This endpoint differs from the public `GET /api/v1/entradas` listing: it includes draft (unpublished) entries. Operators only see their own entries; administrators see all.
+</Warning>
+
+```bash
+GET /api/v1/entradas/gestion
+```
+
+### Query parameters
+
+<ParamField query="publicado" type="integer">
+  Filter by publication status. `1` = published, `0` = draft.
+</ParamField>
+
+<ParamField query="desde" type="string">
+  Start of date range (ISO 8601). Must be used together with `hasta`.
+</ParamField>
+
+<ParamField query="hasta" type="string">
+  End of date range (ISO 8601). Must be used together with `desde`.
+</ParamField>
+
+<ParamField query="criterio_id" type="integer">
+  Filter by entry criterion ID.
+</ParamField>
+
+<ParamField query="impacto_id" type="integer">
+  Filter by impact catalog ID.
+</ParamField>
+
+<ParamField query="pm_clase_orden_id" type="integer">
+  Filter by PM order class ID.
+</ParamField>
+
+<ParamField query="pm_clase_actividad_id" type="integer">
+  Filter by PM activity class ID.
+</ParamField>
+
+<ParamField query="tipo_registro" type="string">
+  Filter by record type. Allowed values: `operativo`, `inventario`.
+</ParamField>
+
+<ParamField query="externo_id" type="string">
+  Partial match against linked external reference identifiers.
+</ParamField>
+
+<ParamField query="inventario_elemento_id" type="integer">
+  Filter entries that reference a specific inventory element.
+</ParamField>
+
+<ParamField query="equipo_id" type="integer">
+  Filter entries linked to a specific equipment record (direct or pivot).
+</ParamField>
+
+<ParamField query="usuario_id" type="integer">
+  Filter by author user ID. Available to administrators only; ignored for operators.
+</ParamField>
+
+<ParamField query="texto" type="string">
+  Full-text search across `titulo`, `cuerpo_texto`, `resumen_tecnico`, related PM classes, locations, equipment, inventory elements, and external references.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Number of results per page. Clamped to 1–100.
+</ParamField>
+
+### Response
+
+Returns a paginated `EntradaResource` collection. See [Entry object](#entry-object) below.
+
+---
+
+## Create entry
+
+```bash
+POST /api/v1/entradas
+```
+
+### Request body
+
+<ParamField body="titulo" type="string" required>
+  Entry title. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="cuerpo_html" type="string" required>
+  HTML body of the entry.
+</ParamField>
+
+<ParamField body="cuerpo_texto" type="string" required>
+  Plain-text version of the body (used for search indexing).
+</ParamField>
+
+<ParamField body="fecha_inicio" type="string" required>
+  Start date/time of the event (ISO 8601 date).
+</ParamField>
+
+<ParamField body="tipo_registro" type="string" required>
+  Record type. Allowed values: `operativo`, `inventario`.
+</ParamField>
+
+<ParamField body="fecha_fin" type="string">
+  End date/time of the event. Must be on or after `fecha_inicio`.
+</ParamField>
+
+<ParamField body="ubicacion_tecnica_id" type="integer">
+  ID of the primary technical location (`dm_ubicaciones_tecnicas`).
+</ParamField>
+
+<ParamField body="equipo_id" type="integer">
+  ID of the primary equipment record (`dm_equipos`).
+</ParamField>
+
+<ParamField body="ubicacion_manual" type="string">
+  Free-text location when no catalog record applies. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="equipo_manual" type="string">
+  Free-text equipment description when no catalog record applies. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="entrada_criterio_id" type="integer">
+  ID of the entry criterion catalog record.
+</ParamField>
+
+<ParamField body="entrada_impacto_id" type="integer">
+  ID of the impact catalog record.
+</ParamField>
+
+<ParamField body="pm_clase_orden_id" type="integer">
+  PM order class ID. When provided, `pm_clase_actividad_id` is also required and the combination must exist in the PM matrix.
+</ParamField>
+
+<ParamField body="pm_clase_actividad_id" type="integer">
+  PM activity class ID. Must be paired with `pm_clase_orden_id`.
+</ParamField>
+
+<ParamField body="accion_inventario" type="string">
+  Inventory action when `tipo_registro` is `inventario`. Allowed values: `alta`, `baja`, `cambio`.
+</ParamField>
+
+<ParamField body="evento_detectado" type="object">
+  Detected event associated with this entry.
+  <Expandable title="evento_detectado fields">
+    <ParamField body="tipo_evento" type="string" required>
+      Event type. Allowed values: `FALLA`, `ANOMALIA`.
+    </ParamField>
+    <ParamField body="detalle" type="string">
+      Optional free-text detail. Maximum 255 characters.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="ubicaciones" type="array">
+  Additional technical locations to associate with the entry. Replaces the current set.
+  <Expandable title="ubicaciones item">
+    <ParamField body="id" type="integer" required>
+      ID from `dm_ubicaciones_tecnicas`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="equipos" type="array">
+  Additional equipment records to associate. Replaces the current set.
+  <Expandable title="equipos item">
+    <ParamField body="id" type="integer" required>
+      ID from `dm_equipos`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="inventario_elementos" type="array">
+  Inventory elements to link to the entry. Replaces the current set.
+  <Expandable title="inventario_elementos item">
+    <ParamField body="id" type="integer" required>
+      ID from `inv_elementos_redes`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="adjuntos" type="array">
+  IDs of previously uploaded temporary attachments to associate with this entry.
+  <Expandable title="adjuntos item">
+    Each element is an integer ID from the `adjuntos` table belonging to the authenticated user and not yet assigned to an entry.
+  </Expandable>
+</ParamField>
+
+<Note>
+  The field `resumen_tecnico` is **prohibited** in the request body — the server generates it automatically from the entry's relations.
+</Note>
+
+<Warning>
+  If you supply `pm_clase_orden_id`, you must also supply `pm_clase_actividad_id`, and the pair must already exist in the PM matrix (`pm_clase_orden × pm_clase_actividad`). Otherwise the request returns `422`.
+</Warning>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/entradas \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "titulo": "Falla en enlace troncal norte",
+    "cuerpo_html": "<p>Se detectó pérdida de señal en el enlace troncal norte a las 03:12 UTC.</p>",
+    "cuerpo_texto": "Se detectó pérdida de señal en el enlace troncal norte a las 03:12 UTC.",
+    "fecha_inicio": "2026-03-14T03:12:00",
+    "tipo_registro": "operativo",
+    "entrada_criterio_id": 2,
+    "entrada_impacto_id": 3,
+    "evento_detectado": {
+      "tipo_evento": "FALLA",
+      "detalle": "Pérdida de luz en fibra"
+    }
+  }'
+```
+
+### Response
+
+Returns the created `EntradaResource` object with HTTP `200`.
+
+---
+
+## Update entry
+
+```bash
+PUT /api/v1/entradas/{entrada}
+```
+
+All fields are optional (`sometimes`). Only the fields you include are updated.
+
+In addition to the fields from [Create entry](#create-entry), the update request accepts:
+
+<ParamField body="adjuntos_eliminar" type="array">
+  IDs of attachments currently linked to this entry that you want to remove and delete from storage.
+  <Expandable title="adjuntos_eliminar item">
+    Each element is an integer ID from the `adjuntos` table.
+  </Expandable>
+</ParamField>
+
+<ParamField body="referencias_eliminar" type="array">
+  IDs of external references currently linked to this entry that you want to delete.
+  <Expandable title="referencias_eliminar item">
+    Each element is an integer ID from the `referencias_externas` table.
+  </Expandable>
+</ParamField>
+
+<Note>
+  Passing `evento_detectado: null` removes the detected event record. Omitting the key leaves it unchanged.
+</Note>
+
+### Response
+
+Returns the updated `EntradaResource` object.
+
+---
+
+## Delete entry
+
+```bash
+DELETE /api/v1/entradas/{entrada}
+```
+
+Returns HTTP `204 No Content` on success.
+
+---
+
+## Publish entry
+
+```bash
+POST /api/v1/entradas/{entrada}/publicar
+```
+
+Sets `publicado = true`. The first time an entry is published, `publicado_at` is recorded; subsequent publish operations do not overwrite this timestamp.
+
+### Response
+
+Returns the updated `EntradaResource` object.
+
+---
+
+## Unpublish entry
+
+```bash
+POST /api/v1/entradas/{entrada}/despublicar
+```
+
+Sets `publicado = false`. The `publicado_at` timestamp is preserved as a historical record of first publication.
+
+### Response
+
+Returns the updated `EntradaResource` object.
+
+---
+
+## Dashboard summary
+
+```bash
+GET /api/v1/dashboard/resumen
+```
+
+Returns aggregated statistics for the operations dashboard.
+
+### Query parameters
+
+<ParamField query="anio" type="integer">
+  Year for the monthly series chart. Defaults to the current year.
+</ParamField>
+
+<ParamField query="widgets_anio" type="integer">
+  Year for impact/event widgets. Defaults to the current year.
+</ParamField>
+
+<ParamField query="widgets_mes" type="integer">
+  Month (1–12) for impact/event widgets. Defaults to the current month.
+</ParamField>
+
+<ParamField query="pm_anio" type="integer">
+  Year for the PM series chart.
+</ParamField>
+
+<ParamField query="pm_cuatrimestre" type="integer">
+  Four-month period (1, 2, or 3) for the PM chart.
+</ParamField>
+
+<ParamField query="pm_orden_id" type="integer">
+  When supplied, the PM series breaks down by activity within this order class. Otherwise, it breaks down by order class.
+</ParamField>
+
+<ParamField query="criterio_anio" type="integer">
+  Year for the criterion series chart.
+</ParamField>
+
+<ParamField query="criterio_cuatrimestre" type="integer">
+  Four-month period (1, 2, or 3) for the criterion chart.
+</ParamField>
+
+### Response fields
+
+<ResponseField name="publicadas_mes" type="integer">
+  Published entries in the current calendar month.
+</ResponseField>
+
+<ResponseField name="publicadas_anio" type="integer">
+  Published entries in the current calendar year.
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total entries (all statuses).
+</ResponseField>
+
+<ResponseField name="publicadas" type="integer">
+  Total published entries.
+</ResponseField>
+
+<ResponseField name="borradores" type="integer">
+  Total draft entries.
+</ResponseField>
+
+<ResponseField name="usuarios_activos_top" type="array">
+  Top 5 active users by published entry count.
+</ResponseField>
+
+<ResponseField name="usuarios_activos_baja" type="array">
+  Bottom 5 active users by published entry count.
+</ResponseField>
+
+<ResponseField name="widgets_periodo" type="object">
+  The resolved year and month used for the widget data.
+</ResponseField>
+
+<ResponseField name="impacto_severidad" type="object">
+  Chart data for entries by impact severity.
+  <Expandable title="impacto_severidad fields">
+    <ResponseField name="labels" type="array">Impact names.</ResponseField>
+    <ResponseField name="data" type="array">Entry counts per impact.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="eventos_detectados" type="object">
+  Detected event breakdown.
+  <Expandable title="eventos_detectados fields">
+    <ResponseField name="labels" type="array">`["FALLA", "ANOMALÍA"]`</ResponseField>
+    <ResponseField name="data" type="array">Counts for each event type.</ResponseField>
+    <ResponseField name="total_eventos" type="integer">Sum of FALLA + ANOMALÍA.</ResponseField>
+    <ResponseField name="total_impacto" type="integer">Published entries with severity > 0.</ResponseField>
+    <ResponseField name="porcentaje" type="number">Events as a percentage of impacted entries.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="top_ubicaciones" type="array">
+  Top 5 technical locations by published entry count for the selected period.
+</ResponseField>
+
+<ResponseField name="series" type="object">
+  Monthly entry counts for the selected year, split by `operativo` and `inventario`.
+</ResponseField>
+
+<ResponseField name="pm_series" type="object">
+  PM chart datasets for the selected four-month period.
+</ResponseField>
+
+<ResponseField name="criterio_series" type="object">
+  Criterion chart datasets for the selected four-month period.
+</ResponseField>
+
+---
+
+## Entry object
+
+<ResponseField name="id" type="integer">Unique entry ID.</ResponseField>
+<ResponseField name="titulo" type="string">Title.</ResponseField>
+<ResponseField name="cuerpo_html" type="string">HTML body.</ResponseField>
+<ResponseField name="cuerpo_texto" type="string">Plain-text body.</ResponseField>
+<ResponseField name="resumen_tecnico" type="string">Auto-generated technical summary.</ResponseField>
+<ResponseField name="fecha_inicio" type="string">Event start date/time.</ResponseField>
+<ResponseField name="fecha_fin" type="string">Event end date/time (nullable).</ResponseField>
+<ResponseField name="publicado" type="boolean">Whether the entry is published.</ResponseField>
+<ResponseField name="publicado_at" type="string">Timestamp of first publication (nullable).</ResponseField>
+<ResponseField name="tipo_registro" type="string">`operativo` or `inventario`.</ResponseField>
+<ResponseField name="accion_inventario" type="string">`alta`, `baja`, `cambio`, or `null`.</ResponseField>
+<ResponseField name="usuario" type="object">Author user object (when loaded).</ResponseField>
+<ResponseField name="criterio" type="object">Criterion catalog object (when loaded).</ResponseField>
+<ResponseField name="impacto" type="object">Impact catalog object (when loaded).</ResponseField>
+<ResponseField name="pm_clase_orden" type="object">PM order class (when loaded).</ResponseField>
+<ResponseField name="pm_clase_actividad" type="object">PM activity class (when loaded).</ResponseField>
+<ResponseField name="evento_detectado" type="object">Detected event record (when loaded).</ResponseField>
+<ResponseField name="adjuntos" type="array">Attached files and images (when loaded).</ResponseField>
+<ResponseField name="referencias_externas" type="array">External system references (when loaded).</ResponseField>
+<ResponseField name="ubicacion_tecnica" type="object">Primary technical location (when loaded).</ResponseField>
+<ResponseField name="ubicaciones" type="array">Additional technical locations (when loaded).</ResponseField>
+<ResponseField name="equipo" type="object">Primary equipment record (when loaded).</ResponseField>
+<ResponseField name="equipos" type="array">Additional equipment records (when loaded).</ResponseField>
+<ResponseField name="inventario_elementos" type="array">Linked inventory elements (when loaded).</ResponseField>
+<ResponseField name="prev_id" type="integer">ID of the chronologically next-older entry (nullable).</ResponseField>
+<ResponseField name="next_id" type="integer">ID of the chronologically next-newer entry (nullable).</ResponseField>
+<ResponseField name="created_at" type="string">Record creation timestamp.</ResponseField>
+<ResponseField name="updated_at" type="string">Record last-updated timestamp.</ResponseField>

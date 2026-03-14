@@ -1,0 +1,234 @@
+---
+title: "Admin: maintenance"
+description: "Housekeeping operations for temporary attachments, import files, unused data, and system configuration. Requires the administrador role."
+---
+
+<Warning>
+All endpoints in this section require authentication via a Sanctum bearer token and the `administrador` role.
+</Warning>
+
+## Clean up temporary attachments
+
+```bash
+POST /api/v1/admin/mantenimiento/adjuntos-temporales/cleanup
+```
+
+Removes orphaned attachments — those uploaded by users but never associated with a log entry — that are older than the specified threshold.
+
+<Note>
+  `dry_run` defaults to `true`, which means the endpoint performs a **preview** by default without deleting anything. Always run a dry run first to verify the expected scope before committing the cleanup.
+</Note>
+
+### Request body
+
+<ParamField body="hours" type="integer" default="24">
+  Age threshold in hours. Attachments older than this value are considered candidates for removal. Allowed range: 1–720.
+</ParamField>
+
+<ParamField body="dry_run" type="boolean" default="true">
+  When `true`, returns the list of candidates without deleting them. Set to `false` to execute the cleanup.
+</ParamField>
+
+### Example (dry run)
+
+```bash
+curl -X POST https://example.com/api/v1/admin/mantenimiento/adjuntos-temporales/cleanup \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 48, "dry_run": true}'
+```
+
+### Example (execute)
+
+```bash
+curl -X POST https://example.com/api/v1/admin/mantenimiento/adjuntos-temporales/cleanup \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 48, "dry_run": false}'
+```
+
+### Response
+
+```json
+{
+  "message": "Simulación completada.",
+  "data": {
+    "candidatos": 12,
+    "eliminados": 0
+  }
+}
+```
+
+When `dry_run` is `false`, `"message"` is `"Limpieza de adjuntos temporales completada."` and `"eliminados"` reflects the actual count deleted.
+
+---
+
+## Clean up import files
+
+```bash
+POST /api/v1/admin/mantenimiento/importaciones-archivos/cleanup
+```
+
+Removes temporary CSV files stored during inventory import executions that are older than the specified threshold. The associated `inv_importaciones_redes` records are not deleted — only the uploaded source files from disk.
+
+### Request body
+
+<ParamField body="hours" type="integer" default="24">
+  Age threshold in hours. Allowed range: 1–720.
+</ParamField>
+
+<ParamField body="dry_run" type="boolean" default="true">
+  When `true`, returns the list of candidates without deleting them.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/mantenimiento/importaciones-archivos/cleanup \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 72, "dry_run": false}'
+```
+
+### Response
+
+```json
+{
+  "message": "Limpieza de archivos de importación completada.",
+  "data": {
+    "candidatos": 5,
+    "eliminados": 5
+  }
+}
+```
+
+---
+
+## Purge unused records
+
+```bash
+POST /api/v1/admin/depuracion/purgar-no-usados
+```
+
+Permanently deletes inventory elements, equipment, and technical locations that are not referenced by any log entry.
+
+<Warning>
+  This operation runs inside a database transaction but is **irreversible**. Use it only after verifying via `dry_run` mode on the maintenance endpoints or reviewing counts in the inventory admin UI.
+</Warning>
+
+### Request body
+
+<ParamField body="confirmaciones" type="integer" required>
+  Must be exactly `3`. This acts as a deliberate confirmation gate to prevent accidental purges.
+</ParamField>
+
+<ParamField body="alcance" type="string" required>
+  Scope of the purge. Allowed values:
+  - `inventario` — deletes inventory elements (`inv_elementos_redes`) with no linked entries.
+  - `ubicaciones_equipos` — deletes equipment (`dm_equipos`) with no linked entries, then deletes technical locations (`dm_ubicaciones_tecnicas`) with no linked entries and no remaining equipment.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/depuracion/purgar-no-usados \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"confirmaciones": 3, "alcance": "inventario"}'
+```
+
+### Response
+
+```json
+{
+  "message": "Depuración de Inventario NMS/EMS completada. Solo se eliminaron elementos no usados en bitácora.",
+  "data": {
+    "alcance": "inventario",
+    "inventario_elementos_candidatos": 320,
+    "inventario_elementos_eliminados": 320,
+    "equipos_candidatos": 0,
+    "equipos_eliminados": 0,
+    "ubicaciones_candidatas": 0,
+    "ubicaciones_eliminadas": 0,
+    "total_eliminados": 320
+  }
+}
+```
+
+### Response fields
+
+<ResponseField name="alcance" type="string">The scope that was executed.</ResponseField>
+<ResponseField name="inventario_elementos_candidatos" type="integer">Unused inventory elements found.</ResponseField>
+<ResponseField name="inventario_elementos_eliminados" type="integer">Inventory elements deleted.</ResponseField>
+<ResponseField name="equipos_candidatos" type="integer">Unused equipment records found.</ResponseField>
+<ResponseField name="equipos_eliminados" type="integer">Equipment records deleted.</ResponseField>
+<ResponseField name="ubicaciones_candidatas" type="integer">Unused technical locations found.</ResponseField>
+<ResponseField name="ubicaciones_eliminadas" type="integer">Technical locations deleted.</ResponseField>
+<ResponseField name="total_eliminados" type="integer">Total records deleted across all scopes.</ResponseField>
+
+---
+
+## Update system configuration
+
+```bash
+PUT /api/v1/admin/configuracion/sistema/{configuracion}
+```
+
+Updates a single system configuration key. All fields are optional (`sometimes`).
+
+<ParamField body="clave" type="string">
+  Configuration key. Maximum 120 characters. Must remain unique.
+</ParamField>
+
+<ParamField body="valor" type="string">
+  New value. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="tipo" type="string">
+  Value data type. Allowed values: `int`, `bool`, `string`.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Human-readable description. Maximum 255 characters.
+</ParamField>
+
+### Example
+
+```bash
+curl -X PUT https://example.com/api/v1/admin/configuracion/sistema/5 \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "valor": "1920"
+  }'
+```
+
+### Response
+
+Returns the updated `ConfiguracionSistemaResource` object.
+
+```json
+{
+  "id": 5,
+  "clave": "imagenes.max_ancho",
+  "valor": "1920",
+  "tipo": "int",
+  "descripcion": "Ancho máximo en píxeles para imágenes subidas"
+}
+```
+
+### Common configuration keys
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `bitacora_publica` | `bool` | Whether the log is publicly accessible without authentication |
+| `imagenes.max_mb` | `int` | Maximum image upload size in MB (default 2) |
+| `imagenes.max_ancho` | `int` | Maximum image width in pixels (default 1920) |
+| `imagenes.max_alto` | `int` | Maximum image height in pixels (default 1080) |
+| `imagenes.calidad_png` | `int` | PNG quality percentage 0–100 (default 90) |
+| `archivos.max_mb` | `int` | Maximum file upload size in MB (default 5, capped at 10) |
+| `archivos.permitir_pdf` | `bool` | Allow PDF uploads |
+| `archivos.permitir_doc` | `bool` | Allow DOC uploads |
+| `archivos.permitir_docx` | `bool` | Allow DOCX uploads |
+| `archivos.permitir_xls` | `bool` | Allow XLS uploads |
+| `archivos.permitir_xlsx` | `bool` | Allow XLSX uploads |

@@ -1,0 +1,170 @@
+---
+title: "Technical locations and equipment"
+description: "Manage the SAP-like hierarchy of technical locations and their associated equipment records, including bulk import from ZPM017 Excel files."
+---
+
+Bitácora Operativa models physical infrastructure using a SAP PM-like hierarchy. Three tables work together:
+
+<CardGroup cols={3}>
+  <Card title="DmUbicacionTecnica" icon="map-pin">
+    Technical locations arranged in up to 8 hierarchical levels.
+  </Card>
+  <Card title="DmEquipo" icon="cpu">
+    Equipment items attached to a technical location.
+  </Card>
+  <Card title="DmUbicacionDetalleNivel" icon="layers">
+    A lookup table that gives human-readable meaning to each level code.
+  </Card>
+</CardGroup>
+
+Administrators manage all three from **Administración > Ubicaciones y Equipos** (`/ubicaciones-equipos`).
+
+## Technical location hierarchy
+
+The `DmUbicacionTecnica` model stores records in the `dm_ubicaciones_tecnicas` table. Each record represents one node in the SAP-like hierarchy and carries its full level decomposition.
+
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `codigo` | string | Unique identifier following the hyphenated SAP format (e.g., `BC-T011-SE-PJZ`). |
+| `nombre` | string | Human-readable name of the location. |
+| `nivel_1` | string (2) | Level 1 — regional area (e.g., `BC`). |
+| `nivel_2` | string (4) | Level 2 — sub-area / work center (e.g., `T011`). |
+| `nivel_3` | string (2) | Level 3 — main system type, the "branch" (e.g., `SE`). |
+| `nivel_4` | string (3) | Level 4 — installation name / site acronym. |
+| `nivel_5` | string (2) | Level 5 — secondary system type. |
+| `nivel_6` | string (5) | Level 6 — nomenclature (may include underscores or hyphens, e.g., `13_KV`). |
+| `nivel_7` | string (3) | Level 7 — equipment type, first level. |
+| `nivel_8` | string (2) | Level 8 — equipment type, second level. |
+| `activo` | boolean | Whether this location appears in entry and equipment forms. |
+| `fuente` | string | `Manual` or `Importacion` — how the record was created. |
+| `last_sync_at` | datetime | Timestamp of the last import sync (null for manual records). |
+
+### Level semantics
+
+Based on the SAP homologation documentation for GRTBC:
+
+| Level | Meaning | Max chars | Example values |
+|---|---|---|---|
+| 1 | Regional area (GRT) | 2 | `BC` |
+| 2 | Sub-area / work center | 4 | `T010`, `T011`, `T012`, `T013` |
+| 3 | Main system type (branch) | 2 | `LT`, `SE`, `TA`, `PG`, `ZO` |
+| 4 | Installation name | 3 | `PJZ`, `CHQ`, `230`, `COM` |
+| 5 | Secondary system type | 2 | `BB`, `BL`, `EA`, `AE`, `AS` |
+| 6 | Nomenclature | 5 | `EEP`, `ESP`, `FOP`, `13_KV` |
+| 7 | Equipment type — 1st level | 3 | `RAD`, `REI`, `FOP`, `CFO` |
+| 8 | Equipment type — 2nd level | 2 | `CE`, `CF` |
+
+<Note>
+Level 6 values may contain underscores or hyphens within the value (e.g., `13_KV`, `T-020`). These do not create extra levels — the parser treats them as a single 5-character segment.
+</Note>
+
+### Parsing the code automatically
+
+In the **Nueva ubicación** form you can type a full SAP code (e.g., `BC-T011-SE-PJZ-BL-EEP-IN`) and click **Extraer niveles**. The UI splits the code on hyphens and populates each `nivel_N` field automatically.
+
+## Equipment
+
+The `DmEquipo` model stores records in the `dm_equipos` table. Each equipment item belongs to one technical location.
+
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `codigo` | string | Unique equipment identifier (SAP equipment number). |
+| `nombre` | string | Equipment denomination. |
+| `ubicacion_tecnica_id` | FK | Reference to `dm_ubicaciones_tecnicas`. Optional. |
+| `area` | string | Functional area within the location (max 40 chars). |
+| `activo` | boolean | Whether this equipment appears in the entry form. |
+| `fuente` | string | `Manual` or `Importacion`. |
+| `last_sync_at` | datetime | Timestamp of the last import sync. |
+
+## Location detail levels
+
+The `DmUbicacionDetalleNivel` model stores lookup entries in the `dm_ubicacion_detalle_nivel` table. Each row maps a `(nivel, codigo, rama_nivel_3)` triplet to a human-readable name and description. This data powers the tooltip that decodes each segment when you hover over a location code in the UI.
+
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `nivel` | integer | The level number (1–8). |
+| `codigo` | string | The segment code at that level. |
+| `nombre` | string | Human-readable name for this code. |
+| `descripcion` | string | Optional extended description. |
+| `rama_nivel_3` | string (2) | Branch from Level 3 that scopes this entry (use `--` for levels 1–3). |
+| `activo` | boolean | Whether this detail entry is active. |
+| `origen` | string | `Homologado` (official) or `Detectado` (inferred from data). |
+
+## Importing from ZPM017
+
+You can bulk-load technical locations and equipment from a SAP ZPM017 export file (`.xlsx` or `.xlsm`).
+
+<Steps>
+  <Step title="Export from SAP">
+    Generate a ZPM017 equipment list export from your SAP system. The importer maps columns by header name, not by column index.
+  </Step>
+  <Step title="Upload the file">
+    On the **Ubicaciones y Equipos** page, click **Importar ZPM017** and select the file. The button is disabled while an import is in progress.
+  </Step>
+  <Step title="Review the result">
+    After the import completes, the tables refresh. Records are upserted using `codigo` as the unique key — existing records are updated, new ones are inserted. The `fuente` field is set to `Importacion` and `last_sync_at` is stamped with the current time.
+  </Step>
+</Steps>
+
+<Info>
+The ZPM017 import maps the source columns as follows: **Equipo** → `dm_equipos.codigo`, **Denominación** → `dm_equipos.nombre`, **Ubicación técnica** → resolves `dm_ubicaciones_tecnicas.codigo` to set the FK, **Área de empresa** → `dm_equipos.area`.
+</Info>
+
+## Admin management UI
+
+The `/ubicaciones-equipos` page has three sections:
+
+**Ubicaciones técnicas** — paginated table with filters by search text, status, and usage (used / unused in entries). Click **Nueva ubicación** to add a record manually. The edit form includes the full 8-level grid.
+
+**Equipos** — paginated table with filters by search text, associated location, status, and usage. Click **Nuevo equipo** to add a record manually.
+
+**Detallar Ubicación Técnica (Manual)** — manage the lookup entries that decode each level segment. Filter by level (1–8), branch (rama N3), origin, and status. Click **Nuevo detalle** to add an entry.
+
+### Purging unused records
+
+The **Depurar no usados** button at the bottom of the page permanently deletes technical locations and equipment that are not referenced by any logbook entry. The action requires three confirmation dialogs and cannot be undone from the UI.
+
+```http
+POST /api/v1/admin/depuracion/purgar-no-usados
+```
+
+## How entries associate with locations
+
+When you create or edit a logbook entry, the form lets you attach one or more technical locations and equipment items. Locations are stored in the `entrada_ubicaciones` pivot table; equipment is stored in the `entrada_equipos` pivot table.
+
+## API routes
+
+Public read-only (no authentication required):
+
+```http
+GET /api/v1/ubicaciones
+GET /api/v1/ubicaciones/detalle-niveles
+GET /api/v1/equipos
+```
+
+Admin CRUD (requires `administrador` role):
+
+```http
+GET    /api/v1/admin/dm/ubicaciones
+POST   /api/v1/admin/dm/ubicaciones
+PUT    /api/v1/admin/dm/ubicaciones/{ubicacion}
+DELETE /api/v1/admin/dm/ubicaciones/{ubicacion}
+
+GET    /api/v1/admin/dm/equipos
+POST   /api/v1/admin/dm/equipos
+PUT    /api/v1/admin/dm/equipos/{equipo}
+DELETE /api/v1/admin/dm/equipos/{equipo}
+
+GET    /api/v1/admin/dm/detalle-niveles
+POST   /api/v1/admin/dm/detalle-niveles
+PUT    /api/v1/admin/dm/detalle-niveles/{detalleNivel}
+DELETE /api/v1/admin/dm/detalle-niveles/{detalleNivel}
+
+POST   /api/v1/admin/dm/importar-zpm017
+```

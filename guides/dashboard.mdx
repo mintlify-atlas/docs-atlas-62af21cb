@@ -1,0 +1,109 @@
+---
+title: "Dashboard"
+description: "The dashboard gives operators and administrators an at-a-glance operational summary with charts and metrics about published logbook entries."
+---
+
+The dashboard (`/dashboard`) requires authentication. Users with the **operador** or **administrador** role can access it. Unauthenticated users are redirected to `/login`.
+
+The dashboard loads all data from `GET /api/v1/dashboard/resumen`. Each chart section is independently configurable with its own period selectors, and all charts re-fetch data when you apply a new period.
+
+## Summary counters
+
+The top section displays three stat cards sourced from `resumen`:
+
+<CardGroup cols={3}>
+  <Card title="Publicadas · Mes actual" icon="calendar">
+    Count of published entries (`publicado = 1`) whose `fecha_inicio` falls within the current calendar month.
+  </Card>
+  <Card title="Publicadas · Año actual" icon="calendar-check">
+    Count of published entries whose `fecha_inicio` falls within the current calendar year.
+  </Card>
+  <Card title="Total en sistema" icon="chart-bar">
+    Total entry count in the database, broken down into **Publicadas** (green badge) and **Borradores** (amber badge).
+  </Card>
+</CardGroup>
+
+## Monthly widgets
+
+This section provides three charts for a selectable month and year period. Use the **Periodo de widgets** controls (month dropdown + year input) and click **Aplicar fecha** to change the period.
+
+### Severity by impact (Impacto)
+
+A horizontal bar chart showing the count of published entries grouped by impact level (`entrada_impacto_id`), ordered by the `severidad` value of each impact catalog entry. Entries with no impact level are shown as "Sin impacto registrado".
+
+### Detected events (Eventos detectados)
+
+A doughnut chart comparing the count of `FALLA` events (red) vs `ANOMALIA` events (amber) for the selected period. Below the chart, a percentage shows what proportion of entries with a severity impact also had a detected event recorded.
+
+### Top technical locations (Ubicaciones técnicas)
+
+A ranked list of up to 5 technical locations (`dm_ubicaciones_tecnicas`) that appear most frequently as the `ubicacion_tecnica_id` of published entries in the selected period. Each item shows the location name, code, and entry count.
+
+## Operational vs inventory chart
+
+A grouped bar chart (blue = Operativo, amber = Inventario) showing the monthly count of entries by `tipo_registro` for a full calendar year. Use the **Año** input and click **Aplicar año** to change the year.
+
+The API returns 12 data points (one per calendar month, labeled Ene–Dic) for each series.
+
+## PM activity order chart
+
+A bar chart showing PM-classified entry counts grouped by 4-month quadrimester (cuatrimestre). The quadrimester covers 4 calendar months:
+
+| Cuatrimestre | Months |
+|---|---|
+| 1 | January – April |
+| 2 | May – August |
+| 3 | September – December |
+
+Use the **Clase de orden**, **Año**, and **Cuatrimestre** controls and click **Aplicar fecha** to update the chart.
+
+- When **no** clase de orden is selected, the chart groups entries by `pm_clase_orden_id` (one series per order class).
+- When a clase de orden is selected, the chart drills down and groups entries by `pm_clase_actividad_id` within that order (one series per activity class). The chart title updates to reflect the selected order.
+
+## Entries by thematic criterion
+
+A bar chart showing published entry counts grouped by `entrada_criterio_id` across a quadrimester. Use the **Año** and **Cuatrimestre** controls and click **Aplicar fecha** to update the chart.
+
+Each criterion in the catalog produces a separate data series (one bar per month in the quadrimester).
+
+## User activity
+
+This section shows two lists of active users (`activo = 1`), each limited to 5 users, sorted by published entry count:
+
+- **Más activos** — users with the highest number of published entries.
+- **Actividad baja** — users with the lowest number of published entries.
+
+Each item shows the user's name, email address, and published entry count.
+
+<Info>
+  Only users with `activo = 1` appear in these lists. Users who have been deactivated are excluded.
+</Info>
+
+## Widget order
+
+The order in which the six dashboard sections appear is controlled by the user configuration key `dashboard.widgets_order`. This is a comma-separated list of section identifiers:
+
+```text
+resumen,mensuales,operativo_inventario,pm,criterio,usuarios
+```
+
+You can customise the order in your account **Configuración** page. Any sections missing from your saved order are appended at the end in their default position.
+
+## Navigating from the dashboard
+
+From the dashboard you can navigate directly to the key operational areas:
+
+<CardGroup cols={2}>
+  <Card title="New entry" icon="plus" href="/guides/entries">
+    Go to **Gestión de Entradas** → click **Nueva Entrada** to create a logbook entry.
+  </Card>
+  <Card title="Entry management list" icon="list" href="/guides/entries">
+    Navigate to `/entradas/gestion` to view, filter, and edit all entries.
+  </Card>
+  <Card title="Timeline" icon="timeline" href="/guides/timeline">
+    The public timeline at `/timeline` shows all published entries to any visitor.
+  </Card>
+  <Card title="System configuration" icon="settings" href="/guides/system-configuration">
+    Administrators can adjust system-wide settings including `bitacora_publica` and attachment limits.
+  </Card>
+</CardGroup>

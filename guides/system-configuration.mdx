@@ -1,0 +1,156 @@
+---
+title: "System configuration"
+description: "Edit global application settings, manage file attachment limits, and run maintenance cleanup tasks from the admin configuration page."
+---
+
+System configuration stores application-wide settings as key-value pairs in the `configuracion_sistema` table, managed by the `ConfiguracionSistema` model. Administrators edit these values from **Configuración > Configuración del Sistema** (`/configuracion`, **Sistema** tab).
+
+Each record has a `clave` (key), a `valor` (value), a `tipo` (`string`, `int`, or `bool`), and a `descripcion` for display in the UI.
+
+## Configuration sections
+
+### General
+
+These four keys control basic application identity and behaviour:
+
+| Clave | Tipo | Default | Description |
+|---|---|---|---|
+| `app_nombre` | string | `Bitácora COReFO B.C.` | Visible application name shown in the page header. |
+| `app_siglas` | string | `Bitácora` | Short acronym shown in the sidebar and browser tab. |
+| `timezone` | string | `America/Tijuana` | Default timezone for entry timestamps. |
+| `paginacion.default_per_page` | int | `20` | Number of records per page in all paginated lists. |
+
+### Tema del portal (theme)
+
+| Clave | Tipo | Default | Description |
+|---|---|---|---|
+| `tema.modo` | string | `dark` | Portal theme: `dark` or `light`. Users can override this per-account in **Configuración de Usuario**. |
+
+### Entradas de bitácora
+
+| Clave | Tipo | Default | Description |
+|---|---|---|---|
+| `bitacora_publica` | bool | `0` | When enabled (`1`), unauthenticated users can read the public timeline. |
+| `max_adjuntos_por_entrada` | int | `15` | Maximum number of attachments allowed per logbook entry. |
+
+<Note>
+The `GET /api/v1/configuracion/sistema` endpoint is public. Non-admin callers receive a subset of keys (`app_nombre`, `app_siglas`, `timezone`, `bitacora_publica`, `max_adjuntos_por_entrada`, `paginacion.default_per_page`, and all `tema.*`, `enlaces.*`, `imagenes.*`, `archivos.*` keys). Only authenticated administrators receive all keys.
+</Note>
+
+### Imágenes adjuntas
+
+| Clave | Tipo | Default | Description |
+|---|---|---|---|
+| `imagenes.max_mb` | int | `2` | Maximum image file size in MB. |
+| `imagenes.max_ancho` | int | `1920` | Maximum image width in pixels. Images are resized on upload if wider. |
+| `imagenes.max_alto` | int | `1080` | Maximum image height in pixels. |
+| `imagenes.calidad_png` | int | `90` | PNG quality/compression level applied when converting uploaded images. |
+
+### Archivos adjuntos
+
+| Clave | Tipo | Default | Description |
+|---|---|---|---|
+| `archivos.max_mb` | int | `5` | Maximum file attachment size in MB. |
+| `archivos.permitir_pdf` | bool | `1` | Allow PDF file uploads. |
+| `archivos.permitir_doc` | bool | `1` | Allow DOC file uploads. |
+| `archivos.permitir_docx` | bool | `1` | Allow DOCX file uploads. |
+| `archivos.permitir_xls` | bool | `1` | Allow XLS file uploads. |
+| `archivos.permitir_xlsx` | bool | `1` | Allow XLSX file uploads. |
+
+### Enlaces
+
+| Clave | Tipo | Default | Description |
+|---|---|---|---|
+| `enlaces.gtrbc_url` | string | `#` | URL for the G.R.T.B.C. link in the top bar. |
+| `enlaces.subger_comunicaciones_url` | string | `#` | URL for the Subgerencia de Comunicaciones link. |
+| `enlaces.ayuda_url` | string | `#` | URL for the help link in the top bar. |
+
+## Editing a setting
+
+<Steps>
+  <Step title="Open system configuration">
+    Navigate to **Configuración** in the sidebar. If you are an administrator, the **Configuración del Sistema** tab is selected by default.
+  </Step>
+  <Step title="Locate the setting">
+    Settings are grouped by section. Scroll to the relevant group. Each row shows the `descripcion` as the label and the `clave` beneath it in smaller text.
+  </Step>
+  <Step title="Change the value">
+    - For **string** or **int** keys: edit the input field directly.
+    - For **bool** keys: click the toggle button to switch between **Activo** and **Inactivo**.
+    - For `tema.modo`: use the dropdown to select **Oscuro** or **Claro**.
+  </Step>
+  <Step title="Save">
+    Click **Guardar** next to the modified field. Each setting saves individually. The button turns green and shows **Guardado** on success.
+  </Step>
+</Steps>
+
+The API endpoint for saving is:
+
+```http
+PUT /api/v1/admin/configuracion/sistema/{configuracion}
+```
+
+## Maintenance tab
+
+The **Mantenimiento** section at the bottom of the **Configuración del Sistema** view provides two cleanup operations.
+
+### Cleanup temporary attachments
+
+This operation removes orphaned attachment records (files uploaded but never saved to an entry) and their corresponding files on disk.
+
+<Steps>
+  <Step title="Set the minimum age">
+    Enter a number of hours in **Antigüedad mínima (horas)**. Only attachments older than this threshold are eligible for removal. The default is `24` hours; the maximum is `720`.
+  </Step>
+  <Step title="Simulate first">
+    Click **Simular limpieza** to run a dry-run. The result shows how many attachments would be removed without deleting anything.
+  </Step>
+  <Step title="Execute">
+    Click **Ejecutar limpieza** to permanently delete the eligible records and files.
+  </Step>
+</Steps>
+
+```http
+POST /api/v1/admin/mantenimiento/adjuntos-temporales/cleanup
+```
+
+Body parameters:
+
+```json
+{
+  "hours": 24,
+  "dry_run": true
+}
+```
+
+Set `dry_run` to `false` to execute the real cleanup.
+
+You can also trigger this from the CLI:
+
+```bash
+php artisan adjuntos:cleanup --hours=24
+```
+
+### Cleanup import files
+
+This operation deletes temporary files uploaded for inventory imports (NMS/EMS) and SAP-like bulk loads stored in `storage/app/imports`.
+
+The workflow is the same: set the minimum age, simulate first, then execute.
+
+```http
+POST /api/v1/admin/mantenimiento/importaciones-archivos/cleanup
+```
+
+<Warning>
+Both cleanup operations are permanent. Run the simulation before executing to confirm the expected scope of deletion.
+</Warning>
+
+## After changing rate-limit or cache-sensitive settings
+
+If you change settings that affect Laravel's route cache or configuration cache (for example, after modifying `paginacion.default_per_page` in environments where `config:cache` is active), clear the application cache:
+
+```bash
+php artisan optimize:clear
+```
+
+This clears the route cache, config cache, and compiled views so that the new values take effect immediately.

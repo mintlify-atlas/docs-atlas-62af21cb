@@ -1,0 +1,183 @@
+---
+title: "Admin: operational catalogs"
+description: "Manage entry criteria and impact catalogs. Requires the administrador role."
+---
+
+<Warning>
+All endpoints in this section require authentication via a Sanctum bearer token and the `administrador` role.
+</Warning>
+
+## Entry criteria
+
+Entry criteria define the reason or trigger category for a log entry (for example, scheduled maintenance, emergency, audit).
+
+### List criteria
+
+```bash
+GET /api/v1/admin/catalogos/criterios
+```
+
+Returns all criteria ordered by `orden`, each with an `entradas_count` showing how many entries reference it.
+
+### Create criterion
+
+```bash
+POST /api/v1/admin/catalogos/criterios
+```
+
+<ParamField body="codigo" type="string" required>
+  Unique short code. Maximum 60 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Display name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="orden" type="integer">
+  Sort order for display in the UI.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Whether the criterion is selectable in new entries. Defaults to `true`.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/catalogos/criterios \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "codigo": "MANT_PROG",
+    "nombre": "Mantenimiento programado",
+    "descripcion": "Trabajo planificado con ventana autorizada",
+    "orden": 10,
+    "activo": true
+  }'
+```
+
+### Update criterion
+
+```bash
+PUT /api/v1/admin/catalogos/criterios/{criterio}
+```
+
+Accepts the same fields as create. All fields are optional (`sometimes`).
+
+<Note>
+  `codigo` must remain unique within the table. The update validator uses `unique:cat_entrada_criterio,codigo,{id}` to allow re-submitting the same code.
+</Note>
+
+### Delete criterion
+
+```bash
+DELETE /api/v1/admin/catalogos/criterios/{criterio}
+```
+
+Returns `204 No Content` on success. Returns `422` if any entry currently references this criterion.
+
+---
+
+## Entry impacts
+
+Impact records classify the operational severity of an event (for example, partial degradation, full outage).
+
+### List impacts
+
+```bash
+GET /api/v1/admin/catalogos/impactos
+```
+
+Returns all impacts ordered by `orden`, each with an `entradas_count`.
+
+### Create impact
+
+```bash
+POST /api/v1/admin/catalogos/impactos
+```
+
+<ParamField body="codigo" type="string" required>
+  Unique short code. Maximum 60 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Display name. Maximum 120 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="severidad" type="integer">
+  Numeric severity level used in dashboard calculations. Higher values represent greater impact.
+</ParamField>
+
+<ParamField body="orden" type="integer">
+  Sort order for display in the UI.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Whether the impact is selectable in new entries. Defaults to `true`.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/catalogos/impactos \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "codigo": "TOTAL",
+    "nombre": "Interrupción total",
+    "severidad": 5,
+    "orden": 50,
+    "activo": true
+  }'
+```
+
+### Update impact
+
+```bash
+PUT /api/v1/admin/catalogos/impactos/{impacto}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete impact
+
+```bash
+DELETE /api/v1/admin/catalogos/impactos/{impacto}
+```
+
+Returns `204 No Content` on success. Returns `422` if any entry currently references this impact.
+
+---
+
+## Criterion object
+
+<ResponseField name="id" type="integer">Unique criterion ID.</ResponseField>
+<ResponseField name="codigo" type="string">Short code.</ResponseField>
+<ResponseField name="nombre" type="string">Display name.</ResponseField>
+<ResponseField name="descripcion" type="string">Description (nullable).</ResponseField>
+<ResponseField name="orden" type="integer">Display order.</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="entradas_count" type="integer">Number of entries referencing this criterion.</ResponseField>
+<ResponseField name="eventos_count" type="integer">Number of detected events referencing this criterion.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when `entradas_count` or `eventos_count` is greater than zero.</ResponseField>
+
+## Impact object
+
+<ResponseField name="id" type="integer">Unique impact ID.</ResponseField>
+<ResponseField name="codigo" type="string">Short code.</ResponseField>
+<ResponseField name="nombre" type="string">Display name.</ResponseField>
+<ResponseField name="descripcion" type="string">Description (nullable).</ResponseField>
+<ResponseField name="severidad" type="integer">Numeric severity level (nullable).</ResponseField>
+<ResponseField name="orden" type="integer">Display order.</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="entradas_count" type="integer">Number of entries referencing this impact.</ResponseField>
+<ResponseField name="eventos_count" type="integer">Number of detected events referencing this impact.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when `entradas_count` or `eventos_count` is greater than zero.</ResponseField>

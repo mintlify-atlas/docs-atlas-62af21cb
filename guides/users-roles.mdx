@@ -1,0 +1,124 @@
+---
+title: "Users and roles"
+description: "Create and manage user accounts, assign roles, and control access to the logbook."
+---
+
+User management is available to administrators at **Administración > Usuarios y Roles** (`/usuarios-roles`). Users can change their own password at **Configuración > Configuración de Usuario** (`/configuracion`).
+
+## User model
+
+The `User` model stores records in the `usuarios` table and uses [Spatie Laravel Permission](https://spatie.be/docs/laravel-permission) for role assignment.
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `nombre` | string | Yes | Full display name. |
+| `correo` | string | Yes | Email address used to log in (unique). |
+| `password` | string | Yes | Bcrypt-hashed password. Not returned in API responses. |
+| `activo` | boolean | Yes | Inactive users cannot log in. |
+| `rpe` | string | No | Internal employee ID (RPE). |
+| `rtt` | string | No | Internal RTT identifier. |
+| `estatus_actual` | string | No | Employment status — `Base` or `Temporal`. |
+
+## Roles
+
+The system uses three roles managed via Spatie Permission:
+
+<CardGroup cols={3}>
+  <Card title="administrador" icon="shield">
+    Full access to all admin pages: catalogs, PM matrix, external systems, locations, users, and system configuration.
+  </Card>
+  <Card title="operador" icon="user">
+    Can create, edit, and publish logbook entries. Has access to the dashboard and personal preferences in **Configuración de Usuario**.
+  </Card>
+  <Card title="invitado" icon="eye">
+    No assigned role. Can only view the public timeline (if `bitacora_publica` is enabled) or the read-only entry view.
+  </Card>
+</CardGroup>
+
+<Note>
+Users with no role assigned are treated as **invitado** in the interface. A user without an explicit role cannot access the dashboard or create entries.
+</Note>
+
+## Creating a user
+
+Only users with the `administrador` role can create accounts.
+
+<Steps>
+  <Step title="Open the form">
+    Go to **Usuarios y Roles** and click **Nuevo Usuario**.
+  </Step>
+  <Step title="Fill in the required fields">
+    Enter the **Nombre**, **Correo**, and initial **Contraseña** (minimum 8 characters). Select the **Estatus** (`Base` or `Temporal`).
+  </Step>
+  <Step title="Assign a role">
+    Check one or more roles from the **Roles** checkbox group. A user with no role checked will have **invitado** access.
+  </Step>
+  <Step title="Save">
+    Click **Crear usuario**. The user list refreshes with the new account.
+  </Step>
+</Steps>
+
+## Editing a user
+
+Click the edit icon on the user's row. All fields are editable:
+
+- Leave **Contraseña** empty to keep the existing password.
+- Change **Activo** to **Inactivo** to prevent the user from logging in without deleting their history.
+- Add or remove roles by checking/unchecking the **Roles** checkboxes.
+
+<Warning>
+You cannot deactivate or remove the `administrador` role from the last active administrator. The status selector and role checkbox are disabled when only one active administrator exists.
+</Warning>
+
+## Deactivating a user
+
+Set **Activo** to **Inactivo** in the edit form and click **Guardar cambios**. Deactivated users are blocked from logging in but all their logbook entries are preserved.
+
+## Deleting a user
+
+The delete icon is disabled when:
+
+- The user has logbook history (`has_historial = true`).
+- The user is the last active administrator.
+
+To remove a user who has history, deactivate them instead.
+
+## Self-service password change
+
+Any authenticated user (operador or administrador) can change their own password without involving an administrator.
+
+<Steps>
+  <Step title="Navigate to Configuración">
+    Click **Configuración** in the sidebar and open the **Configuración de Usuario** tab.
+  </Step>
+  <Step title="Find the password section">
+    Scroll to **Cambiar contraseña**.
+  </Step>
+  <Step title="Enter credentials">
+    Enter your **Contraseña actual**, then type and confirm the **Nueva contraseña**.
+  </Step>
+  <Step title="Submit">
+    Click **Actualizar contraseña**. The API validates the current password before applying the change.
+  </Step>
+</Steps>
+
+The self-service endpoint is:
+
+```http
+PUT /api/v1/configuracion/usuario/password
+```
+
+## API routes
+
+Admin CRUD (requires `administrador` role):
+
+```http
+GET    /api/v1/admin/usuarios
+POST   /api/v1/admin/usuarios
+PUT    /api/v1/admin/usuarios/{user}
+DELETE /api/v1/admin/usuarios/{user}
+
+GET    /api/v1/admin/roles
+```

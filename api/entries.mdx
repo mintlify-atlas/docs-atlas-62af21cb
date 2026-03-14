@@ -1,0 +1,276 @@
+---
+title: "Entries (public)"
+description: "Read published log entries from the Bitácora Operativa API."
+---
+
+These endpoints expose published log entries. No authentication is required unless the `bitacora_publica` system flag is disabled, in which case a valid session is required.
+
+---
+
+## List entries
+
+`GET /api/v1/entradas`
+
+Returns a paginated collection of log entries ordered by `fecha_inicio` descending. Unauthenticated requests only see published entries (`publicado = true`).
+
+### Query parameters
+
+<ParamField query="publicado" type="boolean">
+  When `true`, restricts results to published entries only. Authenticated operators and administrators see all entries by default; pass this flag to explicitly filter to published.
+</ParamField>
+
+<ParamField query="desde" type="string">
+  Start of date range. ISO 8601 date string (e.g. `2024-01-01`). Must be used together with `hasta`.
+</ParamField>
+
+<ParamField query="hasta" type="string">
+  End of date range. ISO 8601 date string (e.g. `2024-12-31`). Must be used together with `desde`.
+</ParamField>
+
+<ParamField query="criterio_id" type="integer">
+  Filter by entry criterion ID.
+</ParamField>
+
+<ParamField query="impacto_id" type="integer">
+  Filter by impact level ID.
+</ParamField>
+
+<ParamField query="pm_clase_orden_id" type="integer">
+  Filter by PM work order class ID.
+</ParamField>
+
+<ParamField query="pm_clase_actividad_id" type="integer">
+  Filter by PM activity class ID.
+</ParamField>
+
+<ParamField query="tipo_registro" type="string">
+  Filter by record type. One of `operativo` or `inventario`.
+</ParamField>
+
+<ParamField query="externo_id" type="string">
+  Partial-match filter on linked external reference IDs (e.g. a ticket number).
+</ParamField>
+
+<ParamField query="inventario_elemento_id" type="integer">
+  Filter entries linked to a specific inventory element ID.
+</ParamField>
+
+<ParamField query="equipo_id" type="integer">
+  Filter entries where the primary or any associated equipment matches this ID.
+</ParamField>
+
+<ParamField query="texto" type="string">
+  Full-text search across `titulo`, `cuerpo_texto`, `resumen_tecnico`, PM class names, location names, equipment codes/names, inventory element codes/names, and external reference IDs.
+</ParamField>
+
+### Response
+
+Returns a Laravel paginated response with a `data` array of entry objects and pagination `links` and `meta`.
+
+<ResponseField name="data" type="object[]">
+  <Expandable title="Entry object">
+    <ResponseField name="id" type="integer">Unique entry ID.</ResponseField>
+    <ResponseField name="titulo" type="string">Entry title.</ResponseField>
+    <ResponseField name="cuerpo_html" type="string">HTML body of the entry.</ResponseField>
+    <ResponseField name="cuerpo_texto" type="string">Plain-text body of the entry.</ResponseField>
+    <ResponseField name="resumen_tecnico" type="string">Auto-generated technical summary.</ResponseField>
+    <ResponseField name="fecha_inicio" type="string">Start datetime (ISO 8601).</ResponseField>
+    <ResponseField name="fecha_fin" type="string | null">End datetime (ISO 8601), or `null` if the event is still open.</ResponseField>
+    <ResponseField name="publicado" type="boolean">Whether the entry is published.</ResponseField>
+    <ResponseField name="publicado_at" type="string | null">Datetime of first publication.</ResponseField>
+    <ResponseField name="tipo_registro" type="string">`operativo` or `inventario`.</ResponseField>
+    <ResponseField name="accion_inventario" type="string | null">`alta`, `baja`, or `cambio` when `tipo_registro` is `inventario`.</ResponseField>
+    <ResponseField name="usuario" type="object | null">
+      The user who created the entry. Only included when the relation is loaded.
+      <Expandable title="usuario">
+        <ResponseField name="id" type="integer">User ID.</ResponseField>
+        <ResponseField name="nombre" type="string">Full name.</ResponseField>
+        <ResponseField name="correo" type="string">Email address.</ResponseField>
+        <ResponseField name="rpe" type="string | null">Personnel code.</ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="criterio" type="object | null">
+      Entry criterion.
+      <Expandable title="criterio">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="codigo" type="string" />
+        <ResponseField name="nombre" type="string" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="impacto" type="object | null">
+      Impact level.
+      <Expandable title="impacto">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="codigo" type="string" />
+        <ResponseField name="nombre" type="string" />
+        <ResponseField name="severidad" type="integer" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="created_at" type="string">Creation timestamp (ISO 8601).</ResponseField>
+    <ResponseField name="updated_at" type="string">Last update timestamp (ISO 8601).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="links" type="object">Pagination links (`first`, `last`, `prev`, `next`).</ResponseField>
+<ResponseField name="meta" type="object">Pagination metadata (`current_page`, `per_page`, `total`, etc.).</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/entradas?tipo_registro=operativo&desde=2024-01-01&hasta=2024-03-31" \
+  -H "Accept: application/json"
+```
+
+### Example response
+
+```json
+{
+  "data": [
+    {
+      "id": 42,
+      "titulo": "Interrupción enlace troncal norte",
+      "cuerpo_html": "<p>Se detectó caída del enlace...</p>",
+      "cuerpo_texto": "Se detectó caída del enlace...",
+      "resumen_tecnico": "Enlace troncal norte | FALLA",
+      "fecha_inicio": "2024-03-10T08:30:00.000000Z",
+      "fecha_fin": "2024-03-10T10:15:00.000000Z",
+      "publicado": true,
+      "publicado_at": "2024-03-10T10:20:00.000000Z",
+      "tipo_registro": "operativo",
+      "accion_inventario": null,
+      "usuario": {
+        "id": 7,
+        "nombre": "Ana Gómez",
+        "correo": "ana.gomez@example.com",
+        "rpe": "AG001"
+      },
+      "criterio": {
+        "id": 2,
+        "codigo": "INT",
+        "nombre": "Interrupción de servicio"
+      },
+      "impacto": {
+        "id": 3,
+        "codigo": "ALT",
+        "nombre": "Alto",
+        "severidad": 3
+      },
+      "created_at": "2024-03-10T08:45:00.000000Z",
+      "updated_at": "2024-03-10T10:20:00.000000Z"
+    }
+  ],
+  "links": {
+    "first": "https://your-app.example.com/api/v1/entradas?page=1",
+    "last": "https://your-app.example.com/api/v1/entradas?page=5",
+    "prev": null,
+    "next": "https://your-app.example.com/api/v1/entradas?page=2"
+  },
+  "meta": {
+    "current_page": 1,
+    "per_page": 20,
+    "total": 94
+  }
+}
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |
+| `401` | Authentication required (`bitacora_publica` is disabled). |
+
+---
+
+## Get a single entry
+
+`GET /api/v1/entradas/{entrada}`
+
+Returns a single log entry with all relations loaded, plus navigation IDs for the previous and next entries in chronological order.
+
+### Path parameters
+
+<ParamField path="entrada" type="integer" required>
+  The ID of the entry.
+</ParamField>
+
+### Response
+
+Returns a single `EntradaResource` object. In addition to all fields described in the list endpoint, the single-entry response includes:
+
+<ResponseField name="data" type="object">
+  <Expandable title="Additional fields in single-entry response" defaultOpen>
+    <ResponseField name="pm_clase_orden" type="object | null">
+      PM work order class.
+      <Expandable title="pm_clase_orden">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="nombre" type="string" />
+        <ResponseField name="descripcion" type="string | null" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="pm_clase_actividad" type="object | null">
+      PM activity class.
+      <Expandable title="pm_clase_actividad">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="nombre" type="string" />
+        <ResponseField name="descripcion" type="string | null" />
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="evento_detectado" type="object | null">
+      Detected event details, if recorded.
+      <Expandable title="evento_detectado">
+        <ResponseField name="entrada_id" type="integer" />
+        <ResponseField name="tipo_evento" type="string">`FALLA` or `ANOMALIA`.</ResponseField>
+        <ResponseField name="detalle" type="string | null">Free-text description.</ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="adjuntos" type="object[]">
+      Attached files and images.
+      <Expandable title="adjunto">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="tipo" type="string">`imagen` or `archivo`.</ResponseField>
+        <ResponseField name="nombre_original" type="string" />
+        <ResponseField name="mime_final" type="string" />
+        <ResponseField name="tamano_bytes_final" type="integer" />
+        <ResponseField name="url" type="string">Absolute URL to the stored file.</ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="referencias_externas" type="object[]">
+      Linked external system references.
+      <Expandable title="referencia_externa">
+        <ResponseField name="id" type="integer" />
+        <ResponseField name="externo_id" type="string">The ticket or reference ID in the external system.</ResponseField>
+        <ResponseField name="sistema" type="object">
+          <Expandable title="sistema">
+            <ResponseField name="id" type="integer" />
+            <ResponseField name="codigo" type="string" />
+            <ResponseField name="nombre" type="string" />
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="ubicacion_tecnica" type="object | null">Primary technical location (see `/api/v1/ubicaciones`).</ResponseField>
+    <ResponseField name="ubicaciones" type="object[]">Additional associated locations.</ResponseField>
+    <ResponseField name="equipo" type="object | null">Primary associated equipment (see `/api/v1/equipos`).</ResponseField>
+    <ResponseField name="equipos" type="object[]">Additional associated equipment.</ResponseField>
+    <ResponseField name="inventario_elementos" type="object[]">Linked inventory elements (see `/api/v1/inventario/elementos`).</ResponseField>
+    <ResponseField name="prev_id" type="integer | null">ID of the chronologically previous entry.</ResponseField>
+    <ResponseField name="next_id" type="integer | null">ID of the chronologically next entry.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example request
+
+```bash
+curl -X GET "https://your-app.example.com/api/v1/entradas/42" \
+  -H "Accept: application/json"
+```
+
+### Status codes
+
+| Code | Description |
+|---|---|
+| `200` | Success. |
+| `401` | Authentication required (`bitacora_publica` is disabled). |
+| `403` | Authenticated but the entry is not published and you lack operator access. |
+| `404` | Entry not found. |

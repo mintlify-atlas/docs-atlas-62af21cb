@@ -1,0 +1,157 @@
+---
+title: "Attachments (operator)"
+description: "Upload images and files to attach to log entries. Requires the operador or administrador role."
+---
+
+<Note>
+All endpoints in this section require authentication via a Sanctum bearer token and the `operador` or `administrador` role.
+</Note>
+
+## Temp attachments vs associated attachments
+
+Attachments follow a two-step lifecycle:
+
+1. **Upload (temp)** — you upload the file before saving an entry. The returned `id` has `entrada_id: null`.
+2. **Associate** — when you create or update an entry, you include the attachment IDs in the `adjuntos` array of the entry request body. The server binds them to the entry at that point.
+
+Attachments that remain unassociated can be cleaned up by the admin [maintenance endpoint](/api/admin-maintenance).
+
+---
+
+## Upload image
+
+```bash
+POST /api/v1/adjuntos/imagen
+```
+
+Uploads an image file. The server normalises every accepted image to **PNG** format using PHP's GD extension, applies optional resizing, and stores the result. The original file format and dimensions are not preserved.
+
+### Request
+
+Content-Type: `multipart/form-data`
+
+<ParamField body="file" type="file" required>
+  The image to upload. Must be a valid image file (GD-readable). Maximum size is controlled by the `imagenes.max_mb` system configuration key (default **2 MB**, hard-capped at 50 MB by the request validator).
+</ParamField>
+
+<Note>
+  The server reads `imagenes.max_ancho` (default 1920 px), `imagenes.max_alto` (default 1080 px), and `imagenes.calidad_png` (default 90) from system configuration to resize and compress the output PNG. Aspect ratio is preserved when resizing.
+</Note>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/adjuntos/imagen \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/screenshot.png"
+```
+
+### Response
+
+Returns an `AdjuntoResource` object.
+
+```json
+{
+  "id": 42,
+  "entrada_id": null,
+  "usuario_id": 7,
+  "tipo": "imagen",
+  "nombre_original": "screenshot.png",
+  "mime_original": "image/png",
+  "tamano_bytes_original": 204800,
+  "extension_final": "png",
+  "mime_final": "image/png",
+  "tamano_bytes_final": 186320,
+  "ancho": 1280,
+  "alto": 720,
+  "ruta": "adjuntos/imagenes/2026/03/550e8400-e29b-41d4-a716-446655440000.png",
+  "url": "https://example.com/storage/adjuntos/imagenes/2026/03/550e8400-e29b-41d4-a716-446655440000.png",
+  "sha256": "a3f5...",
+  "created_at": "2026-03-14T10:30:00.000000Z"
+}
+```
+
+---
+
+## Upload file
+
+```bash
+POST /api/v1/adjuntos/archivo
+```
+
+Uploads a document file. The file is stored as-is without format conversion. Allowed extensions and maximum size are controlled by system configuration keys.
+
+### Request
+
+Content-Type: `multipart/form-data`
+
+<ParamField body="file" type="file" required>
+  The file to upload. Allowed extensions are determined by the following system configuration keys (each a boolean flag defaulting to enabled):
+  - `archivos.permitir_pdf` — `.pdf`
+  - `archivos.permitir_doc` — `.doc`
+  - `archivos.permitir_docx` — `.docx`
+  - `archivos.permitir_xls` — `.xls`
+  - `archivos.permitir_xlsx` — `.xlsx`
+
+  Maximum size is set by `archivos.max_mb` (default **5 MB**, capped at 10 MB).
+</ParamField>
+
+<Warning>
+  If no file types are enabled in system configuration, the upload will be rejected with a `422` error.
+</Warning>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/adjuntos/archivo \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@/path/to/report.pdf"
+```
+
+### Response
+
+Returns an `AdjuntoResource` object. For files, `ancho` and `alto` are `null`.
+
+---
+
+## Delete attachment
+
+```bash
+DELETE /api/v1/adjuntos/{adjunto}
+```
+
+Deletes an attachment record and removes the underlying file from storage.
+
+**Authorization rules:**
+- If the attachment is associated with an entry, you must have permission to update that entry.
+- If the attachment is still in temp state (`entrada_id` is `null`), you must be the user who uploaded it.
+
+Returns HTTP `204 No Content` on success.
+
+### Example
+
+```bash
+curl -X DELETE https://example.com/api/v1/adjuntos/42 \
+  -H "Authorization: Bearer {token}"
+```
+
+---
+
+## Attachment object
+
+<ResponseField name="id" type="integer">Unique attachment ID.</ResponseField>
+<ResponseField name="entrada_id" type="integer">ID of the associated entry, or `null` if still a temp attachment.</ResponseField>
+<ResponseField name="usuario_id" type="integer">ID of the uploading user.</ResponseField>
+<ResponseField name="tipo" type="string">`imagen` or `archivo`.</ResponseField>
+<ResponseField name="nombre_original" type="string">Original client filename.</ResponseField>
+<ResponseField name="mime_original" type="string">MIME type of the original upload.</ResponseField>
+<ResponseField name="tamano_bytes_original" type="integer">Size of the original upload in bytes.</ResponseField>
+<ResponseField name="extension_final" type="string">Extension of the stored file (always `png` for images).</ResponseField>
+<ResponseField name="mime_final" type="string">MIME type of the stored file (`image/png` for images).</ResponseField>
+<ResponseField name="tamano_bytes_final" type="integer">Size of the stored file in bytes.</ResponseField>
+<ResponseField name="ancho" type="integer">Image width in pixels (images only; `null` for files).</ResponseField>
+<ResponseField name="alto" type="integer">Image height in pixels (images only; `null` for files).</ResponseField>
+<ResponseField name="ruta" type="string">Storage path relative to the public disk.</ResponseField>
+<ResponseField name="url" type="string">Absolute public URL to the stored file.</ResponseField>
+<ResponseField name="sha256" type="string">SHA-256 hash of the stored file content.</ResponseField>
+<ResponseField name="created_at" type="string">Upload timestamp.</ResponseField>

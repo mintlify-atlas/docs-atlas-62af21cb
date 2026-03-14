@@ -1,0 +1,306 @@
+---
+title: "Admin: locations and equipment"
+description: "Manage technical locations, equipment, detail level catalog, and SAP ZPM017 imports. Requires the administrador role."
+---
+
+<Warning>
+All endpoints in this section require authentication via a Sanctum bearer token and the `administrador` role.
+</Warning>
+
+## Technical locations
+
+Technical locations follow a hierarchical SAP-style coding scheme with up to 8 levels.
+
+### List technical locations
+
+```bash
+GET /api/v1/admin/dm/ubicaciones
+```
+
+Returns all technical locations with usage counts (`equipos_count`, `entradas_directas_count`, `entradas_pivot_count`).
+
+### Create technical location
+
+```bash
+POST /api/v1/admin/dm/ubicaciones
+```
+
+<ParamField body="codigo" type="string" required>
+  Unique location code. Maximum 80 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Display name. Maximum 200 characters.
+</ParamField>
+
+<ParamField body="nivel_1" type="string" required>
+  Level 1 segment code. Exactly 2 characters.
+</ParamField>
+
+<ParamField body="nivel_2" type="string">
+  Level 2 segment code. Exactly 4 characters.
+</ParamField>
+
+<ParamField body="nivel_3" type="string">
+  Level 3 segment code. Exactly 2 characters.
+</ParamField>
+
+<ParamField body="nivel_4" type="string">
+  Level 4 segment code. Exactly 3 characters.
+</ParamField>
+
+<ParamField body="nivel_5" type="string">
+  Level 5 segment code. Exactly 2 characters.
+</ParamField>
+
+<ParamField body="nivel_6" type="string">
+  Level 6 segment code. Exactly 5 characters.
+</ParamField>
+
+<ParamField body="nivel_7" type="string">
+  Level 7 segment code. Exactly 3 characters.
+</ParamField>
+
+<ParamField body="nivel_8" type="string">
+  Level 8 segment code. Exactly 2 characters.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Active flag. Defaults to `true`.
+</ParamField>
+
+<Note>
+  The `fuente` and `last_sync_at` fields are **prohibited** — they are managed by the SAP import process.
+</Note>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/dm/ubicaciones \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "codigo": "MX-CD-01-A01",
+    "nombre": "Centro de Datos 01 — Sala A01",
+    "nivel_1": "MX",
+    "nivel_2": "CDMX",
+    "nivel_3": "01",
+    "activo": true
+  }'
+```
+
+### Update technical location
+
+```bash
+PUT /api/v1/admin/dm/ubicaciones/{ubicacion}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete technical location
+
+```bash
+DELETE /api/v1/admin/dm/ubicaciones/{ubicacion}
+```
+
+Returns `204 No Content`.
+
+---
+
+## Equipment
+
+### List equipment
+
+```bash
+GET /api/v1/admin/dm/equipos
+```
+
+Returns all equipment records with usage counts.
+
+### Create equipment
+
+```bash
+POST /api/v1/admin/dm/equipos
+```
+
+<ParamField body="codigo" type="string" required>
+  Unique equipment code. Maximum 80 characters.
+</ParamField>
+
+<ParamField body="nombre" type="string" required>
+  Display name. Maximum 200 characters.
+</ParamField>
+
+<ParamField body="ubicacion_tecnica_id" type="integer">
+  ID of the associated technical location.
+</ParamField>
+
+<ParamField body="area" type="string">
+  Area or zone label. Maximum 40 characters.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Active flag. Defaults to `true`.
+</ParamField>
+
+<Note>
+  The `fuente` and `last_sync_at` fields are **prohibited** — they are managed by the SAP import process.
+</Note>
+
+### Update equipment
+
+```bash
+PUT /api/v1/admin/dm/equipos/{equipo}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete equipment
+
+```bash
+DELETE /api/v1/admin/dm/equipos/{equipo}
+```
+
+Returns `204 No Content`.
+
+---
+
+## Detail levels
+
+Detail level records describe the meaning of each hierarchical segment code in a technical location (for example, "MX" at level 1 = Mexico).
+
+### List detail levels
+
+```bash
+GET /api/v1/admin/dm/detalle-niveles
+```
+
+### Create detail level
+
+```bash
+POST /api/v1/admin/dm/detalle-niveles
+```
+
+<ParamField body="nivel" type="integer" required>
+  Hierarchy level (1–8).
+</ParamField>
+
+<ParamField body="codigo" type="string" required>
+  Segment code. Maximum 20 characters. Automatically uppercased.
+</ParamField>
+
+<ParamField body="nombre" type="string">
+  Human-readable label for this code. Maximum 160 characters.
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Optional description. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="rama_nivel_3" type="string">
+  The level-3 branch this record belongs to. Required for levels 4–8 (exactly 2 characters). Automatically set to `--` for levels 1–3.
+</ParamField>
+
+<ParamField body="activo" type="boolean">
+  Active flag.
+</ParamField>
+
+<ParamField body="origen" type="string">
+  Data origin. Allowed values: `Detectado`, `Homologado`. Defaults to `Homologado` when blank.
+</ParamField>
+
+<Note>
+  The combination of `(nivel, codigo, rama_nivel_3)` must be unique. The server validates this and returns `422` if a duplicate is detected.
+</Note>
+
+### Update detail level
+
+```bash
+PUT /api/v1/admin/dm/detalle-niveles/{detalleNivel}
+```
+
+Accepts the same fields as create. All fields are optional.
+
+### Delete detail level
+
+```bash
+DELETE /api/v1/admin/dm/detalle-niveles/{detalleNivel}
+```
+
+Returns `204 No Content`.
+
+---
+
+## ZPM017 import
+
+```bash
+POST /api/v1/admin/dm/importar-zpm017
+```
+
+Imports technical locations and equipment from a SAP ZPM017 Excel export. The service performs an upsert based on the SAP codes in the file.
+
+Content-Type: `multipart/form-data`
+
+<ParamField body="archivo" type="file" required>
+  SAP ZPM017 export file. Accepted formats: `.xlsx`, `.xlsm`. Maximum 100 MB.
+</ParamField>
+
+### Example
+
+```bash
+curl -X POST https://example.com/api/v1/admin/dm/importar-zpm017 \
+  -H "Authorization: Bearer {token}" \
+  -F "archivo=@/path/to/ZPM017.xlsx"
+```
+
+### Response
+
+```json
+{
+  "message": "Importación ZPM017 completada.",
+  "data": {
+    "ubicaciones_creadas": 12,
+    "ubicaciones_actualizadas": 45,
+    "equipos_creados": 8,
+    "equipos_actualizados": 30
+  }
+}
+```
+
+---
+
+## Technical location object
+
+<ResponseField name="id" type="integer">Unique location ID.</ResponseField>
+<ResponseField name="codigo" type="string">Location code.</ResponseField>
+<ResponseField name="nombre" type="string">Display name.</ResponseField>
+<ResponseField name="nivel_1" type="string">Level 1 segment.</ResponseField>
+<ResponseField name="nivel_2" type="string">Level 2 segment (nullable).</ResponseField>
+<ResponseField name="nivel_3" type="string">Level 3 segment (nullable).</ResponseField>
+<ResponseField name="nivel_4" type="string">Level 4 segment (nullable).</ResponseField>
+<ResponseField name="nivel_5" type="string">Level 5 segment (nullable).</ResponseField>
+<ResponseField name="nivel_6" type="string">Level 6 segment (nullable).</ResponseField>
+<ResponseField name="nivel_7" type="string">Level 7 segment (nullable).</ResponseField>
+<ResponseField name="nivel_8" type="string">Level 8 segment (nullable).</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="fuente" type="string">Data source identifier (nullable).</ResponseField>
+<ResponseField name="last_sync_at" type="string">Last SAP sync timestamp (nullable).</ResponseField>
+<ResponseField name="equipos_count" type="integer">Number of equipment records at this location.</ResponseField>
+<ResponseField name="entradas_directas_count" type="integer">Entries with this location as primary.</ResponseField>
+<ResponseField name="entradas_pivot_count" type="integer">Entries linked via the pivot relation.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when any count is greater than zero.</ResponseField>
+
+## Equipment object
+
+<ResponseField name="id" type="integer">Unique equipment ID.</ResponseField>
+<ResponseField name="codigo" type="string">Equipment code.</ResponseField>
+<ResponseField name="nombre" type="string">Display name.</ResponseField>
+<ResponseField name="ubicacion_tecnica_id" type="integer">Parent location ID (nullable).</ResponseField>
+<ResponseField name="ubicacion" type="object">Location summary (when loaded).</ResponseField>
+<ResponseField name="area" type="string">Area label (nullable).</ResponseField>
+<ResponseField name="activo" type="boolean">Active flag.</ResponseField>
+<ResponseField name="fuente" type="string">Data source identifier (nullable).</ResponseField>
+<ResponseField name="last_sync_at" type="string">Last SAP sync timestamp (nullable).</ResponseField>
+<ResponseField name="entradas_directas_count" type="integer">Entries with this equipment as primary.</ResponseField>
+<ResponseField name="entradas_pivot_count" type="integer">Entries linked via the pivot relation.</ResponseField>
+<ResponseField name="in_use" type="boolean">`true` when any count is greater than zero.</ResponseField>

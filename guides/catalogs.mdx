@@ -1,0 +1,134 @@
+---
+title: "Operational catalogs"
+description: "Manage the thematic criteria and operational impact levels that classify every logbook entry."
+---
+
+Operational catalogs are the two controlled vocabulary lists that every logbook entry must reference: **Criterio temático** (thematic criterion) and **Impacto operativo** (operational impact). Administrators manage both from **Administración > Catálogos Técnicos** (`/catalogos-tecnicos`). Only records with `activo = true` appear in the entry form.
+
+## Criterio temático (thematic criterion)
+
+A criterion classifies the topic or purpose of an entry — for example, a routine operation versus a security event. The `CatEntradaCriterio` model stores these records in the `cat_entrada_criterio` table.
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `codigo` | string | Yes | Unique slug identifier (e.g., `operacion`). |
+| `nombre` | string | Yes | Human-readable label shown in the entry form. |
+| `descripcion` | string | No | Optional explanation of the criterion's scope. |
+| `orden` | integer | No | Display order in dropdowns (lower values appear first). |
+| `activo` | boolean | Yes | Only active criteria appear in the entry form. |
+
+### Default values
+
+The `CatalogoOperativoSeeder` seeds the following criteria on fresh installations:
+
+| Código | Nombre | Descripción | Orden |
+|---|---|---|---|
+| `operacion` | Operación | Operación diaria, seguimiento, monitoreo, maniobras | 10 |
+| `seguridad` | Seguridad | Seguridad operativa, riesgos, condiciones inseguras | 20 |
+| `planeacion` | Planeación | Planeación, solicitudes, ventanas | 30 |
+| `documentacion` | Documentación | Actualización de diagramas, procedimientos, evidencias | 40 |
+| `mejora` | Mejora | Mejora continua, lecciones aprendidas, optimización | 50 |
+| `otro` | Otro | No clasificado | 99 |
+
+<Note>
+The seeder deactivates any criterion whose `codigo` is not in the list above. Criteria already referenced by entries are preserved but set to inactive.
+</Note>
+
+## Impacto operativo (operational impact)
+
+An impact level describes the severity of the event recorded in an entry. The `CatEntradaImpacto` model stores these records in the `cat_entrada_impacto` table.
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `codigo` | string | Yes | Unique slug identifier (e.g., `critico`). |
+| `nombre` | string | Yes | Human-readable label shown in the entry form. |
+| `descripcion` | string | No | Optional explanation of the severity level. |
+| `severidad` | integer | Yes | Numeric severity: `0` = no impact, `1` = warning, `2` = minor, `3` = major, `4` = critical. |
+| `orden` | integer | No | Display order in dropdowns. |
+| `activo` | boolean | Yes | Only active impacts appear in the entry form. |
+
+### Default values
+
+The `CatalogoOperativoSeeder` seeds the following impact levels:
+
+| Código | Nombre | Descripción | Severidad |
+|---|---|---|---|
+| `ninguno` | Sin impacto | Sin afectación confirmada | 0 |
+| `advertencia` | Advertencia | Condición anómala sin afectación al servicio | 1 |
+| `menor` | Menor | Afectación menor o localizada | 2 |
+| `mayor` | Mayor | Afectación significativa o degradación severa | 3 |
+| `critico` | Crítico | Interrupción total o impacto crítico | 4 |
+
+<Warning>
+The **Sin impacto** record (code `ninguno`, severity `0`) is protected. You cannot edit or delete it from the UI. It is the default fallback for entries that do not require severity classification.
+</Warning>
+
+## Admin management UI
+
+Navigate to **Administración > Catálogos Técnicos** (`/catalogos-tecnicos`). The page shows two side-by-side panels: **Criterios Temáticos** on the left and **Impactos Operativos** on the right. Both panels support full-text search and status filtering.
+
+### Creating a criterion
+
+<Steps>
+  <Step title="Open the form">
+    Click **Nuevo Criterio** in the top-right area of the page.
+  </Step>
+  <Step title="Fill in the required fields">
+    Enter a unique **Código** and a **Nombre**. Optionally add a **Descripción** and an **Orden** value.
+  </Step>
+  <Step title="Set the status">
+    Choose **Activo** to make the criterion immediately available in the entry form, or **Inactivo** to save it without publishing.
+  </Step>
+  <Step title="Save">
+    Click **Crear criterio**. The panel refreshes with the new record.
+  </Step>
+</Steps>
+
+### Editing a criterion
+
+Click the edit icon on the criterion's row. All fields are editable. Click **Guardar cambios** to apply.
+
+### Deactivating vs. deleting a criterion
+
+- To **hide** a criterion from the entry form without losing it, set its status to **Inactivo** in the edit form.
+- To **delete** a criterion permanently, click the delete icon. The delete button is disabled if the criterion is tagged **En uso** (referenced by at least one entry).
+
+### Creating an impact
+
+The workflow mirrors criterion creation. Click **Nuevo Impacto**, fill in **Código**, **Nombre**, and **Severidad** (required), then click **Crear impacto**.
+
+<AccordionGroup>
+  <Accordion title="What does 'En uso' mean?">
+    The badge **En uso** appears when at least one logbook entry references that catalog record. Records tagged **En uso** cannot be deleted — you must deactivate them instead.
+  </Accordion>
+  <Accordion title="Why is the edit icon disabled on some impacts?">
+    The **Sin impacto** record (code `ninguno`) is system-protected. Its edit and delete actions are permanently disabled to prevent accidentally removing the no-impact fallback.
+  </Accordion>
+</AccordionGroup>
+
+## API routes
+
+These catalog endpoints are publicly accessible (no authentication required):
+
+```http
+GET /api/v1/catalogos/criterios
+GET /api/v1/catalogos/impactos
+```
+
+Admin-only CRUD (requires `administrador` role):
+
+```http
+GET    /api/v1/admin/catalogos/criterios
+POST   /api/v1/admin/catalogos/criterios
+PUT    /api/v1/admin/catalogos/criterios/{criterio}
+DELETE /api/v1/admin/catalogos/criterios/{criterio}
+
+GET    /api/v1/admin/catalogos/impactos
+POST   /api/v1/admin/catalogos/impactos
+PUT    /api/v1/admin/catalogos/impactos/{impacto}
+DELETE /api/v1/admin/catalogos/impactos/{impacto}
+```

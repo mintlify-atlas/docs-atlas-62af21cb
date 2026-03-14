@@ -1,0 +1,191 @@
+---
+title: "Managing entries"
+description: "Learn how to create, edit, publish, and unpublish logbook entries, including rich-text content, file attachments, and external references."
+---
+
+Entries (entradas) are the core records of Bitácora Operativa. Each entry captures an operational event, maintenance activity, or inventory change.
+
+## Entry states
+
+An entry can be in one of two states:
+
+| State | `publicado` value | Visible on timeline |
+|---|---|---|
+| **Borrador** (draft) | `false` | No |
+| **Publicado** | `true` | Yes |
+
+When you first publish an entry, the system records the timestamp in `publicado_at`. This timestamp is never overwritten if you unpublish and republish the entry later — it permanently records the first publication date.
+
+## Entry fields
+
+| Field | Required | Description |
+|---|---|---|
+| `titulo` | No | Short descriptive title of the entry |
+| `fecha_inicio` | No | Start date and time of the event |
+| `fecha_fin` | No | End date and time of the event |
+| `cuerpo_html` | No | Rich-text body (HTML from Tiptap editor) |
+| `cuerpo_texto` | No | Plain-text version of the body (auto-extracted) |
+| `resumen_tecnico` | — | Read-only; auto-generated from selected metadata |
+| `entrada_criterio_id` | Yes | Thematic criterion (criterio temático) |
+| `entrada_impacto_id` | Yes | Impact level (nivel de impacto) |
+| `tipo_evento` | Conditional | Required when `entrada_impacto_id` has severity > 0; must be `FALLA` or `ANOMALIA` |
+| `tipo_registro` | Yes | `operativo` or `inventario` |
+| `accion_inventario` | Conditional | Required when `tipo_registro = inventario`; must be `alta`, `baja`, or `cambio` |
+| `pm_clase_orden_id` | Yes | PM work order class |
+| `pm_clase_actividad_id` | Yes | PM activity class (must be a valid combination with the selected order) |
+| `ubicacion_tecnica_id` | No | SAP-like technical location (from catalog) |
+| `equipo_id` | No | Primary SAP-like equipment (from catalog) |
+| `equipos` | No | Additional equipment items (many-to-many) |
+| `ubicacion_manual` | No | Free-text location when not using the catalog |
+| `equipo_manual` | No | Free-text equipment description when not using the catalog |
+| `inv_elementos` | No | NMS/EMS inventory elements (many-to-many) |
+| `adjuntos` | No | Attached files (images and documents) |
+| `referencias_externas` | No | External system references (folio numbers) |
+
+## Creating an entry
+
+Navigate to `/entradas/nueva`. You must have the **operador** or **administrador** role.
+
+<Steps>
+  <Step title="Fill in the general data">
+    Enter a **Título** that summarises the event. Set **Fecha inicio** (date and time) and optionally **Fecha fin**. The time picker is disabled until you select a date.
+  </Step>
+
+  <Step title="Set the operational classification">
+    In the **Clasificación Técnica** panel on the right:
+
+    - Select a **Criterio Temático**. A short description of the criterion appears below the dropdown.
+    - Select a **Nivel de Impacto**. When the selected impact has a severity greater than zero, a **Evento detectado** dropdown appears. Choose `FALLA` (service interruption or unavailability) or `ANOMALIA` (irregular condition without a full outage).
+    - Select **Tipo de registro**: **Operativo** for events, faults, or shift activities; **Inventario** for NMS/EMS element additions, removals, or changes. When you select **Inventario**, an additional **Acción de inventario** dropdown appears (`alta`, `baja`, or `cambio`).
+  </Step>
+
+  <Step title="Assign the PM activity order">
+    In the **Orden de Actividad** panel:
+
+    - Select a **Clase de orden** from the active PM order classes.
+    - Select a **Clase de actividad**. Only activities that belong to the selected order in the PM matrix are shown.
+
+    Both fields are required. If no active orders or activities exist, contact your administrator.
+  </Step>
+
+  <Step title="Associate inventory elements (optional)">
+    In the **Inventario NMS/EMS** panel, search by code, name, or type. Filter by element type (nodo, enlace, servicio, túnel, trail) using the chip buttons. Click **Agregar** next to each element you want to link. Selected elements appear as tags below the table; click the × on a tag to remove it.
+  </Step>
+
+  <Step title="Add external references (optional)">
+    In the **Referencias a Sistemas Externos** panel:
+
+    1. Select the external system from the **Sistema** dropdown (e.g. RNFO, ticketing system).
+    2. Enter the folio number in the **Folio** field. The field validates against the regex pattern configured for that system.
+    3. Click **Agregar** to add the reference. Added references appear as tags.
+
+    To remove a reference, click the × on its tag.
+  </Step>
+
+  <Step title="Set the technical location and equipment (optional)">
+    In the **Ubicación Técnica y Equipo** panel, choose one of two modes:
+
+    - **Ubicación técnica (SAP-Like)**: drill down through up to three location levels, optionally search by text, then select a location. After selecting a location, search for and add one or more equipment items from the catalog.
+    - **Captura manual**: type a free-text location and equipment description directly.
+  </Step>
+
+  <Step title="Write the body">
+    Use the **Descripción** editor (powered by Tiptap) to write the full entry narrative. The toolbar provides:
+
+    - **Bold** (format_bold)
+    - **Italic** (format_italic)
+    - **Bullet list** (format_list_bulleted)
+    - **Numbered list** (format_list_numbered)
+    - **Insert image** (image) — uploads the selected file and inserts it inline
+    - **Attach file** (upload_file) — uploads a non-image file and lists it below the editor
+
+    You can also paste images directly from the clipboard; they are converted to PNG automatically.
+  </Step>
+
+  <Step title="Save or publish">
+    - Click **Guardar borrador** to save the entry in draft state without publishing it.
+    - Click **Publicar** to save and immediately make the entry visible on the public timeline.
+  </Step>
+</Steps>
+
+## Rich-text editor (Tiptap)
+
+The body editor uses [Tiptap](https://tiptap.dev) with the `StarterKit` and `Image` extensions. The editor stores both an HTML version (`cuerpo_html`) and a plain-text version (`cuerpo_texto`).
+
+### Inserting images
+
+Click the image icon in the toolbar (or paste from the clipboard) to upload an image. Images are uploaded to `POST /api/v1/adjuntos/imagen` before being inserted into the editor as `<img>` tags. Uploaded images are stored as `Adjunto` records with `tipo = imagen`.
+
+### Attaching files
+
+Click the file-upload icon to attach documents. Permitted file types and size limits are read from system configuration:
+
+| Config key | Default |
+|---|---|
+| `archivos.permitir_pdf` | `true` |
+| `archivos.permitir_doc` | `true` |
+| `archivos.permitir_docx` | `true` |
+| `archivos.permitir_xls` | `true` |
+| `archivos.permitir_xlsx` | `true` |
+| `archivos.max_mb` | `5` MB (capped at 10 MB) |
+| `imagenes.max_mb` | `2` MB |
+| `max_adjuntos_por_entrada` | `15` files |
+
+Attached files appear as tags below the editor. Click the × on a tag to remove the file.
+
+<Warning>
+  When you delete an image from the editor body (not just from the attachment list), the system must detect that the image is no longer referenced in the HTML to mark it for deletion. **Always save the entry after removing an image from the body** so that the orphan-detection sync runs and the file is properly deleted from storage. Temporary images (uploaded but not yet associated with a saved entry) are deleted immediately when removed from the editor.
+</Warning>
+
+## Technical summary
+
+The **Resumen técnico** field is read-only in the UI. It is auto-generated by `ResumenTecnicoBuilder` on the server whenever you save or update an entry. It is derived from the associated metadata (location, equipment, inventory elements, PM classification, references, and event type).
+
+## Publishing and unpublishing
+
+**To publish a saved draft:**
+
+1. Open the entry in `/entradas/:id/editar`.
+2. Click **Publicar** in the header toolbar.
+
+**To unpublish a published entry** (revert to draft):
+
+1. Open the entry editor. The **Pasar a borrador** button is visible only when the entry is currently published.
+2. Click **Pasar a borrador**. The entry is removed from the public timeline immediately.
+
+<Note>
+  Unpublishing does not reset `publicado_at`. The original first-publication timestamp is preserved on the record.
+</Note>
+
+Publishing and unpublishing call `POST /api/v1/entradas/{id}/publicar` and `POST /api/v1/entradas/{id}/despublicar` respectively. Both endpoints require the **operador** or **administrador** role.
+
+## Editing an entry
+
+Navigate to `/entradas/:id/editar`. The form is the same as the create form. The page title changes to **Editar Entrada de Bitácora** and the save button label becomes **Guardar cambios**.
+
+When you save an edit, the API calls `PUT /api/v1/entradas/{id}`. Any attachment IDs in `adjuntos_eliminar` and reference IDs in `referencias_eliminar` are hard-deleted along with their storage files.
+
+## Entry management list
+
+The `/entradas/gestion` view (requires **operador** or **administrador** role) provides a paginated table of all entries with inline filtering:
+
+| Filter | Options |
+|---|---|
+| **Buscar** | Full-text search across title, body, summary, PM, locations, equipment, inventory, and references |
+| **Estado** | All / Publicados / Borradores |
+| **Tipo** | All / Operativo / Inventario |
+| **Criterio** | Select from active criteria |
+| **Impacto** | Select from active impact levels |
+| **Clase de orden** | Select from active PM order classes |
+| **Clase de actividad** | Constrained to the selected order |
+| Date range | **Desde** / **Hasta** |
+
+<Info>
+  Operators (`operador` role) see only their own entries. Administrators see all entries.
+</Info>
+
+From the management list you can:
+
+- Click **Nueva Entrada** to go to `/entradas/nueva`.
+- Click an entry row to open it for editing at `/entradas/:id/editar`.
+- Use inline **Publicar** / **Pasar a borrador** actions.
