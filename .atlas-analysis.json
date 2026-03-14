@@ -1,0 +1,134 @@
+{
+  "projectType": "saas",
+  "projectName": "Bitácora Operativa",
+  "projectDescription": "A full-stack web application for recording, publishing, and querying operational events with NMS/EMS inventory integration, SAP-like technical locations, external ticket references, and role-based access control.",
+  "theme": "linden",
+  "primaryColor": "#2563EB",
+  "lightColor": "#EFF6FF",
+  "darkColor": "#1E3A5F",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Getting Started",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["introduction", "architecture"]
+          },
+          {
+            "group": "Setup",
+            "pages": ["quickstart", "configuration", "deployment"]
+          }
+        ]
+      },
+      {
+        "tab": "User Guide",
+        "groups": [
+          {
+            "group": "Core Features",
+            "pages": [
+              "guides/timeline",
+              "guides/entries",
+              "guides/dashboard"
+            ]
+          },
+          {
+            "group": "Inventory",
+            "pages": [
+              "guides/inventory-overview",
+              "guides/import-rules"
+            ]
+          },
+          {
+            "group": "Administration",
+            "pages": [
+              "guides/catalogs",
+              "guides/pm-matrix",
+              "guides/external-systems",
+              "guides/locations-equipment",
+              "guides/users-roles",
+              "guides/system-configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": ["api/authentication", "api/rate-limiting"]
+          },
+          {
+            "group": "Public Endpoints",
+            "pages": [
+              "api/entries",
+              "api/catalogs",
+              "api/inventory",
+              "api/locations",
+              "api/external-systems"
+            ]
+          },
+          {
+            "group": "Operator Endpoints",
+            "pages": [
+              "api/entries-management",
+              "api/attachments",
+              "api/references",
+              "api/user-configuration"
+            ]
+          },
+          {
+            "group": "Admin Endpoints",
+            "pages": [
+              "api/admin-catalogs",
+              "api/admin-pm",
+              "api/admin-inventory",
+              "api/admin-locations",
+              "api/admin-users",
+              "api/admin-maintenance"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Operational event logbook with draft/publish workflow",
+    "Role-based access control (administrator, operator) via Spatie Permissions",
+    "NMS/EMS inventory with network, domain, and element management",
+    "CSV import rules with execution history and rollback",
+    "SAP-like technical locations and equipment hierarchy",
+    "External ticket/folio reference validation with regex patterns",
+    "PM matrix (work order class / activity class)",
+    "WYSIWYG rich-text editor with image attachments",
+    "Public timeline with configurable public access",
+    "Rate-limited REST API with Laravel Sanctum session authentication"
+  ],
+  "publicApiSurface": [
+    "GET /api/v1/entradas",
+    "GET /api/v1/entradas/{entrada}",
+    "GET /api/v1/catalogos/criterios",
+    "GET /api/v1/catalogos/impactos",
+    "GET /api/v1/catalogos/pm/ordenes",
+    "GET /api/v1/catalogos/pm/actividades",
+    "GET /api/v1/catalogos/pm/matriz",
+    "GET /api/v1/sistemas-externos",
+    "GET /api/v1/configuracion/sistema",
+    "GET /api/v1/ubicaciones",
+    "GET /api/v1/ubicaciones/detalle-niveles",
+    "GET /api/v1/equipos",
+    "GET /api/v1/inventario/elementos",
+    "POST /api/v1/entradas",
+    "PUT /api/v1/entradas/{entrada}",
+    "DELETE /api/v1/entradas/{entrada}",
+    "POST /api/v1/entradas/{entrada}/publicar",
+    "POST /api/v1/entradas/{entrada}/despublicar",
+    "POST /api/v1/adjuntos/imagen",
+    "POST /api/v1/adjuntos/archivo",
+    "DELETE /api/v1/adjuntos/{adjunto}",
+    "POST /api/v1/referencias",
+    "GET /api/v1/dashboard/resumen",
+    "GET /api/v1/me"
+  ]
+}
